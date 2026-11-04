@@ -1,2 +1,31 @@
-# openleaf
-An Open-source, free version of overleaf
+# openleaf — an open-source Overleaf-style LaTeX editor
+
+Multi-file LaTeX projects, live recompiling PDF preview, error list that jumps to the offending file and line.
+
+## Run
+```bash
+npm install
+npm start          # bundles the frontend, then serves http://127.0.0.1:3000
+```
+Requires Node 18+ and a TeX distribution with `latexmk` (TeX Live / MacTeX / MiKTeX). `biber` is only needed for `biblatex` with the biber backend; plain BibTeX works out of the box. `synctex` (ships with TeX Live) enables double-click-in-PDF → source.
+
+## Features
+- Projects are plain folders in `./projects/<name>` (override with `PROJECTS_DIR`), nested folders, `\input` / `\include` / images / `.bib` all work.
+- Edit → autosave (0.7 s) → recompile. A newer edit cancels an in-flight compile. `Ctrl/Cmd+Enter` or `Ctrl/Cmd+S` forces a compile; toggle **Auto** to compile manually.
+- Compiles with `latexmk` (pdflatex / xelatex / lualatex), BibTeX handled automatically, shell-escape off, 90 s timeout (`COMPILE_TIMEOUT_MS`).
+- Builds in a hidden `.build/` copy so your source folders stay clean; **Clean build** wipes it.
+- Choose the main document (auto-detected from `\documentclass`); ★ marks it in the tree.
+- Issues panel (errors / warnings) with click-to-jump, error lines highlighted in the editor, raw log tab.
+- Autocomplete for commands, environments, `\ref` labels, `\cite` keys, `\input` and `\includegraphics` paths from the whole project.
+- PDF viewer (pdf.js) keeps scroll position across recompiles; zoom / fit width.
+- Upload files or whole folders (button or drag-and-drop), import an Overleaf `.zip`, download PDF or source `.zip`.
+
+## Security
+Binds to `127.0.0.1` only. LaTeX can run code (e.g. `.latexmkrc`), so don't expose this to a network or untrusted users without adding auth and sandboxing (Docker / bubblewrap).
+
+## v2 additions
+- **Σ Symbols palette** (Ctrl/⌘+Shift+K): *Templates* (Mathematica-style: click derivative, vec hat, matrix… and the caret lands in a blank □ box; type, Tab to the next box; selected text is wrapped into box 1), searchable *Symbols* (588), and *Detexify* (draw a symbol, matched locally). A missing `\usepackage` is offered with one click.
+- Sidebar: Files / Outline / project Search & Replace / History (diff + restore, deleted-file recovery).
+- Security: host allowlist, same-origin checks, optional `AUTH_TOKEN`, symlink and zip-slip protection, no shell-escape.
+- Env: `PORT`, `HOST`, `PROJECTS_DIR`, `AUTH_TOKEN`, `COMPILE_TIMEOUT_MS`, `ALLOWED_HOSTS`.
+- `npm test` runs the backend tests. `npm run build:demo` builds `dist/standalone.html`, a server-less page (no compiling).

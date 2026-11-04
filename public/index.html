@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LaTeX Studio</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23137333'/%3E%3Ctext x='16' y='23' font-size='19' text-anchor='middle' fill='white' font-family='serif' font-weight='bold'%3ETe%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="/pdf_viewer.css">
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<header id="topbar">
+  <button id="projBtn" class="proj" aria-haspopup="true" aria-expanded="false" title="Switch project"><span class="logo">Te</span><span id="projName">Project</span><span class="caret">▾</span></button>
+  <div class="sep"></div>
+  <label class="sel" title="Main file to compile"><span>Main</span><select id="mainSel" aria-label="Main file"></select></label>
+  <label class="sel" title="TeX engine"><span>Engine</span><select id="engineSel" aria-label="Engine"><option value="pdflatex">pdfLaTeX</option><option value="xelatex">XeLaTeX</option><option value="lualatex">LuaLaTeX</option></select></label>
+  <button id="compileBtn" class="primary" title="Recompile (Ctrl/⌘+Enter)"><span class="spin"></span><span class="lbl">Recompile</span></button>
+  <button id="autoBtn" class="toggle" aria-pressed="true" title="Compile automatically after edits">Auto</button>
+  <span id="status" class="status"></span>
+  <span class="grow"></span>
+  <div class="seg" role="group" aria-label="Layout">
+    <button id="layEditor" title="Editor only" aria-label="Editor only">▤</button>
+    <button id="laySplit" title="Editor and PDF" aria-label="Split view">◫</button>
+    <button id="layPdf" title="PDF only" aria-label="PDF only">▥</button>
+  </div>
+  <button id="dlBtn" aria-haspopup="true" aria-expanded="false" title="Download">⬇ Download ▾</button>
+  <button id="settingsBtn" title="Settings" aria-label="Settings">⚙</button>
+  <button id="helpBtn" title="Keyboard shortcuts" aria-label="Keyboard shortcuts">?</button>
+  <span id="connDot" class="off" title="Connecting…"></span>
+</header>
+
+<div id="projMenu" class="menu" hidden></div>
+<div id="dlMenu" class="menu" hidden></div>
+
+<main id="work">
+  <aside id="sidebar">
+    <div id="sideTabs" role="tablist">
+      <button data-side="files" role="tab" title="Files">Files</button>
+      <button data-side="outline" role="tab" title="Document outline">Outline</button>
+      <button data-side="search" role="tab" title="Search in project (Ctrl/⌘+Shift+F)">Search</button>
+      <button data-side="history" role="tab" title="File history">History</button>
+    </div>
+    <div class="side-panel" data-panel="files" id="filesPanel">
+      <div class="side-tools"><button id="newFileBtn" title="New file">＋ File</button><button id="newFolderBtn" title="New folder">＋ Folder</button><button id="uploadBtn" title="Upload files">⬆ Upload</button></div>
+      <div id="tree" tabindex="0" role="tree" aria-label="Project files"></div>
+      <div class="drop-hint">Drop files or folders here to upload</div>
+    </div>
+    <div class="side-panel" data-panel="outline" id="outlinePanel" hidden><div id="outline"></div></div>
+    <div class="side-panel" data-panel="search" id="searchPanel" hidden>
+      <div class="search-box">
+        <div class="row"><input id="searchQ" type="search" placeholder="Search in project" autocomplete="off" spellcheck="false" aria-label="Search">
+          <button id="optCase" class="opt" aria-pressed="false" title="Match case">Aa</button><button id="optWord" class="opt" aria-pressed="false" title="Whole word">ab</button><button id="optRe" class="opt" aria-pressed="false" title="Regular expression">.*</button></div>
+        <div class="row"><input id="replaceQ" type="text" placeholder="Replace with" autocomplete="off" spellcheck="false" aria-label="Replace with"><button id="replaceAllBtn" disabled>Replace all</button></div>
+        <div id="searchCount" class="muted"></div>
+      </div>
+      <div id="searchRes"></div>
+    </div>
+    <div class="side-panel" data-panel="history" id="historyPanel" hidden><div id="historyList"></div></div>
+  </aside>
+  <div class="splitter" id="splitL" role="separator" aria-orientation="vertical" aria-label="Resize sidebar" tabindex="0"></div>
+
+  <section id="editorPane">
+    <div id="tabs" role="tablist"></div>
+    <div id="editorTools">
+      <button id="tbUndo" title="Undo (Ctrl+Z)">↶</button><button id="tbRedo" title="Redo (Ctrl+Shift+Z)">↷</button><span class="sep"></span>
+      <button id="tbBold" title="Bold (Ctrl+B)"><b>B</b></button><button id="tbItalic" title="Italic (Ctrl+I)"><i>I</i></button><button id="tbMath" title="Inline math (Ctrl+M)">$ ⁠$</button><button id="tbComment" title="Toggle comment (Ctrl+/)">%</button><span class="sep"></span>
+      <button id="symBtn" class="sym" aria-haspopup="true" aria-expanded="false" title="Symbols, math templates and Detexify (Ctrl+Shift+K)">Σ Symbols ▾</button>
+      <span class="grow"></span>
+      <button id="tbFind" title="Find in file (Ctrl+F)">Find</button><button id="tbSync" title="Jump to this line in the PDF (Ctrl+Alt+J)">→ PDF</button>
+    </div>
+    <div id="banner" hidden></div>
+    <div id="editorHost"></div>
+    <div id="preview" hidden></div>
+  </section>
+
+  <div class="splitter" id="splitR" role="separator" aria-orientation="vertical" aria-label="Resize PDF pane" tabindex="0"></div>
+
+  <section id="pdfPane">
+    <div id="pdfTools">
+      <button id="zoomOut" title="Zoom out" aria-label="Zoom out">−</button><span id="zoomLabel" class="zoom">100%</span><button id="zoomIn" title="Zoom in" aria-label="Zoom in">＋</button>
+      <button id="fitW" title="Fit width">↔</button><button id="fitP" title="Fit page">⤢</button>
+      <span class="sep"></span>
+      <input id="pageNum" type="number" min="1" value="1" aria-label="Page"> / <span id="pageTotal">0</span>
+      <span class="grow"></span>
+      <input id="pdfFind" type="search" placeholder="Find in PDF" aria-label="Find in PDF" autocomplete="off"><span id="findCount" class="muted"></span>
+      <button id="findPrev" title="Previous match" aria-label="Previous match">↑</button><button id="findNext" title="Next match" aria-label="Next match">↓</button>
+    </div>
+    <div id="pdfScroll"><div id="pdfEmpty"><div><b>No PDF yet</b><br>Press <kbd>Recompile</kbd> or start typing — the preview updates automatically.</div></div><div id="pdfPages"></div></div>
+    <div id="logPanel">
+      <div id="logHead"><button data-tab="issues" class="active" aria-selected="true">Issues <span id="issueCount"></span></button><button data-tab="log" aria-selected="false">Raw log</button><span class="grow"></span><button id="logToggle" class="icon" aria-expanded="false" aria-label="Toggle log panel">▴</button></div>
+      <div id="logBody" class="collapsed"><div id="issues"></div><pre id="rawLog" hidden></pre></div>
+    </div>
+  </section>
+</main>
+
+<footer id="statusbar"><span id="statCursor">Ln 1, Col 1</span><span id="statMode"></span><span class="grow"></span><span id="statWords"></span><span id="statSave"></span></footer>
+
+<div id="palette" class="palette" hidden role="dialog" aria-label="Symbols and templates"></div>
+<div id="toasts" aria-live="polite"></div>
+<input id="fileInput" type="file" multiple hidden>
+<input id="folderInput" type="file" webkitdirectory multiple hidden>
+<input id="zipInput" type="file" accept=".zip,application/zip" hidden>
+<script type="module" src="/app.js"></script>
+</body>
+</html>
