@@ -47,9 +47,9 @@ export async function openFile(path, pos = {}) {
   if (S.current && S.current !== path) stashState();
   if (!S.open.includes(path)) S.open.push(path);
   S.current = path;
-  const ed = $('editorHost'), pv = $('preview'), tools = $('editorTools');
+  const ed = $('editorHost'), pv = $('preview'), tools = $('editorTools'), ftools = $('fmtTools');
   if (isText(path)) {
-    ed.hidden = false; pv.hidden = true; tools.classList.remove('disabled');
+    ed.hidden = false; pv.hidden = true; tools.classList.remove('disabled'); ftools.classList.remove('disabled');
     if (!S.states.has(path)) {
       let text;
       try { text = await fetchText(path); } catch (e) { toast(e.message, { kind: 'error' }); S.open = S.open.filter((x) => x !== path); S.current = S.open[0] || null; renderTabs(); return; }
@@ -59,7 +59,7 @@ export async function openFile(path, pos = {}) {
     setViewState(S.states.get(path));
     if (pos.line) gotoPosition(pos.line, pos.col || 0, pos.len || 0); else if (pos.focus !== false) view.focus();
   } else {
-    ed.hidden = true; pv.hidden = false; tools.classList.add('disabled');
+    ed.hidden = true; pv.hidden = false; tools.classList.add('disabled'); ftools.classList.add('disabled');
     const url = rawUrl(path, `&t=${Date.now()}`);
     pv.innerHTML = IMG_EXT.test(path) ? `<img src="${url}" alt="${esc(path)}">` : /\.pdf$/i.test(path) ? `<iframe src="${url}" title="${esc(path)}"></iframe>` : `<div class="msg">“${esc(fileName(path))}” is a binary file.<br><a href="${rawUrl(path, '&download=1')}">Download</a></div>`;
   }

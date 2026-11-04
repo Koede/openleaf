@@ -121,3 +121,14 @@ body.dropping::after{content:"Drop to upload";position:fixed;inset:8px;border:3p
 #authForm h2{margin:0 0 4px;font-size:20px}.auth-logo{display:flex;gap:8px;align-items:center;font-weight:700;font-size:16px;margin-bottom:6px}
 #authForm .field{margin:0}#authForm input{padding:8px 10px}#authErr{color:var(--err);min-height:1.2em}#authSubmit{padding:8px}
 button.link{border:0;background:none;color:var(--accent);padding:2px}.auth-note{margin:4px 0 0;font-size:12px}
+
+/* ---- formatting bar (Google-Docs style) ---- */
+#fmtTools{display:flex;align-items:center;flex-wrap:wrap;gap:3px;padding:3px 8px;border-bottom:1px solid var(--border);flex:none;background:var(--panel)}
+#fmtTools.disabled{opacity:.4;pointer-events:none}
+#fmtTools button{padding:2px 6px;min-width:26px;height:26px;display:inline-flex;align-items:center;justify-content:center;gap:2px}
+#fmtTools select{height:26px;max-width:132px;padding:0 4px;font:inherit;font-size:12.5px}
+#fmtTools code{font-size:11px}.fmt-A{font-weight:700;border-bottom:3px solid #d33;line-height:1;padding:0 1px}.fmt-hl{background:#fff176;color:#222;padding:0 3px;border-radius:2px;font-size:11px}
+.fmt-menu{min-width:200px}.swatches{display:grid;grid-template-columns:repeat(4,26px);gap:6px;padding:8px 10px}
+.swatch{width:26px;height:26px;border-radius:50%;border:1px solid var(--border);padding:0;cursor:pointer}.swatch:hover{outline:2px solid var(--accent)}
+.tgrid{display:grid;grid-template-columns:repeat(8,18px);gap:3px;padding:6px 10px 10px}
+.tcell{width:18px;height:18px;padding:0;min-width:0!important;border:1px solid var(--border);border-radius:3px;background:var(--bg)}.tcell.on{background:var(--accent);border-color:var(--accent)}

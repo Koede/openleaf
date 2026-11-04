@@ -3,16 +3,16 @@ import { S, bus, prefs, savePrefs, esc, debounce } from './state.js';
 import { insertTemplate, insertSymbol, setExtraCommands, view } from './editor.js';
 import { editFile, openFile } from './files.js';
 import { dropdown, toast } from './ui.js';
+import { classify as matchSymbols, prepareSymbols } from './matcher.js';
 
 const $ = (id) => document.getElementById(id);
 let DATA = null, loading = null;
 const symUrl = (n) => (window.__symUrl ? window.__symUrl(n) : `/symbols/${n}.png`);
-const GRID = 20;
 
 async function ensureData() {
   if (DATA) return DATA;
   if (!loading) loading = fetch('/symbols/symbols.json').then((r) => { if (!r.ok) throw new Error('symbol data missing — run: python3 tools/gen-symbols.py'); return r.json(); }).then((d) => {
-    d.symbols.forEach((s) => { s.f = Float32Array.from(s.p, (v) => v / 100); s.hay = (s.c + ' ' + s.cat + ' ' + s.k + ' ' + s.pkg).toLowerCase(); });
+    prepareSymbols(d.symbols); d.symbols.forEach((s) => { s.hay = (s.c + ' ' + s.cat + ' ' + s.k + ' ' + s.pkg).toLowerCase(); });
     d.templates.forEach((t) => { t.hay = (t.n + ' ' + t.cat + ' ' + t.i.replace(/#\{\d+\}/g, '')).toLowerCase(); });
     setExtraCommands([...new Set(d.symbols.map((s) => s.c).filter((c) => /^\\[A-Za-z]+$/.test(c)).map((c) => c.slice(1)))]);
     DATA = d; return d;
@@ -23,6 +23,7 @@ async function ensureData() {
 setTimeout(() => ensureData().catch(() => {}), 1500);
 
 // ---------- packages ----------
+const PKG_OPTS = { ulem: 'normalem' };   // keep \emph italic when ulem is added for strikethrough
 const IMPLIES = { mathtools: ['amsmath'], amssymb: ['amsfonts'], beamer: ['amsmath', 'amssymb', 'amsfonts', 'graphicx', 'hyperref'], physics: ['amsmath'], siunitx: [], hyperref: [] };
 function loadedPackages() {
   const have = new Set(); let beamer = false;
@@ -36,7 +37,7 @@ function loadedPackages() {
   return have;
 }
 const warned = new Set();
-function checkPackage(pkg, label) {
+export function checkPackage(pkg, label) {
   if (!pkg || ['latexsym'].includes(pkg) && loadedPackages().has('amssymb')) return;
   if (loadedPackages().has(pkg) || warned.has(S.project + pkg)) return;
   warned.add(S.project + pkg);
@@ -50,14 +51,15 @@ export async function addPackage(pkg) {
   else if (files.length) target = files.sort((a, b) => (b[1].match(/\\usepackage/g) || []).length - (a[1].match(/\\usepackage/g) || []).length)[0][0];
   else if (root) target = S.settings.main;
   if (!target) return toast('No document found to add the package to', { kind: 'error' });
+  const usep = `\\usepackage${PKG_OPTS[pkg] ? `[${PKG_OPTS[pkg]}]` : ''}{${pkg}}`;
   const ok = await editFile(target, (text) => {
     const lines = text.split('\n'); let at = -1;
     lines.forEach((l, i) => { if (/^\s*\\usepackage/.test(l)) at = i; });
     if (at < 0) lines.forEach((l, i) => { if (/\\documentclass/.test(l) && at < 0) at = i; });
-    if (at < 0) return `\\usepackage{${pkg}}\n` + text;
-    lines.splice(at + 1, 0, `\\usepackage{${pkg}}`); return lines.join('\n');
+    if (at < 0) return usep + '\n' + text;
+    lines.splice(at + 1, 0, usep); return lines.join('\n');
   });
-  if (ok) toast(`Added \\usepackage{${pkg}} to ${target}`, { kind: 'ok' });
+  if (ok) toast(`Added ${usep} to ${target}`, { kind: 'ok' });
 }
 
 // ---------- recents ----------
@@ -194,51 +196,10 @@ function redraw() {
   }
 }
 
-// Convert strokes to a normalised point set, exactly like the generator does for rendered glyphs.
-export function strokesToPoints(strokes) {
-  const pts = [];
-  for (const s of strokes) {
-    if (!s.length) continue;
-    for (let i = 1; i < s.length; i++) { const a = s[i - 1], b = s[i]; const n = Math.max(1, Math.ceil(Math.hypot(b.x - a.x, b.y - a.y) / 2)); for (let k = 0; k < n; k++) pts.push({ x: a.x + (b.x - a.x) * k / n, y: a.y + (b.y - a.y) * k / n }); }
-    pts.push(s[s.length - 1]);
-  }
-  if (!pts.length) return null;
-  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
-  for (const p of pts) { x0 = Math.min(x0, p.x); y0 = Math.min(y0, p.y); x1 = Math.max(x1, p.x); y1 = Math.max(y1, p.y); }
-  const w = x1 - x0, h = y1 - y0, span = Math.max(w, h);
-  if (span < 10) return null;
-  const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2; const cells = new Map();
-  for (const p of pts) {
-    const u = (p.x - cx) / span + 0.5, v = (p.y - cy) / span + 0.5;
-    const key = Math.min(GRID - 1, Math.floor(u * GRID)) * 100 + Math.min(GRID - 1, Math.floor(v * GRID));
-    const c = cells.get(key); if (c) { c.u += u; c.v += v; c.n++; } else cells.set(key, { u, v, n: 1 });
-  }
-  const arr = []; for (const c of cells.values()) arr.push(c.u / c.n, c.v / c.n);
-  return { f: Float32Array.from(arr), aspect: (w + 1) / (h + 1) };
-}
-function chamfer(a, b) {
-  const na = a.length / 2, nb = b.length / 2; let s1 = 0, s2 = 0; const mb = new Float32Array(nb).fill(1e9);
-  for (let i = 0; i < na; i++) {
-    const ax = a[2 * i], ay = a[2 * i + 1]; let best = 1e9;
-    for (let j = 0; j < nb; j++) { const dx = ax - b[2 * j], dy = ay - b[2 * j + 1]; const d = dx * dx + dy * dy; if (d < best) best = d; if (d < mb[j]) mb[j] = d; }
-    s1 += Math.sqrt(best);
-  }
-  for (let j = 0; j < nb; j++) s2 += Math.sqrt(mb[j]);
-  s1 /= na; s2 /= nb;
-  return 0.5 * (s1 + s2) + 0.25 * Math.max(s1, s2);
-}
-export function classify(strokes, symbols = DATA && DATA.symbols) {
-  const u = strokesToPoints(strokes); if (!u || !symbols) return null;
-  const res = symbols.map((s) => ({ s, d: chamfer(u.f, s.f) + Math.min(1.2, Math.abs(Math.log(u.aspect / s.a))) * 0.05 }));
-  res.sort((a, b) => a.d - b.d);
-  const seen = new Set(), out = [];
-  for (const r of res) { const k = r.s.c; if (seen.has(k)) continue; seen.add(k); out.push(r); if (out.length >= 12) break; }
-  return out;
-}
 const classifySoon = debounce(() => {
   const res = $('detRes'); if (!res) return;
   if (!det.strokes.length) { res.innerHTML = ''; return; }
-  const t0 = performance.now(); const out = classify(det.strokes);
+  const t0 = performance.now(); const out = matchSymbols(det.strokes, DATA.symbols);
   if (!out) { res.innerHTML = '<div class="empty">Draw a bit larger…</div>'; return; }
   $('detInfo').textContent = `${Math.round(performance.now() - t0)} ms`;
   const best = out[0].d; res.innerHTML = '';

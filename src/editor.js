@@ -271,6 +271,41 @@ export function insertTemplate(tpl, { mode = 'math', pkg = '' } = {}) {
   return true;
 }
 
+// ---------- Google-Docs-style formatting ----------
+// Each helper either wraps the selection or drops in a blank box, so whatever is typed next gets the format.
+export function formatInline(before, after, { pkg = '' } = {}) {
+  const v = view; if (!S.current) return false;
+  const sel = v.state.selection.main;
+  if (sel.empty) return insertTemplate(before + '#{1}' + after, { mode: 'text', pkg });
+  wrapSelection(v, before, after); bus.emit('inserted', { pkg }); return true;
+}
+// Block environments (center, itemize…): start on a fresh line; wrap whole selected lines, else open a blank body.
+export function formatBlock(begin, end, { pkg = '', body = '', perLine = null } = {}) {
+  const v = view; if (!S.current) return false;
+  const sel = v.state.selection.main, doc = v.state.doc;
+  if (!sel.empty) {
+    const a = doc.lineAt(sel.from), b = doc.lineAt(sel.to); const text = doc.sliceString(a.from, b.to);
+    const ins = begin + '\n' + (perLine ? text.split('\n').map(perLine).join('\n') : text) + '\n' + end;
+    v.dispatch({ changes: { from: a.from, to: b.to, insert: ins }, selection: { anchor: a.from + ins.length }, userEvent: 'input' });
+    v.focus(); bus.emit('inserted', { pkg }); return true;
+  }
+  const line = doc.lineAt(sel.from); const lead = line.text.slice(0, sel.from - line.from).trim() ? '\n' : '';
+  return insertTemplate(lead + begin + '\n  ' + (body || '#{1}') + '\n' + end + '\n', { mode: 'text', pkg });
+}
+const HEADING = /^(\s*)\\(part|chapter|section|subsection|subsubsection|paragraph|subparagraph)(\*?)\{(.*)\}\s*$/;
+export function headingAt(state, pos = state.selection.main.head) { const m = HEADING.exec(state.doc.lineAt(pos).text); return m ? m[2] : ''; }
+// Paragraph style: turns the current line into \section{…} etc., swaps an existing heading, or '' turns it back into text.
+export function formatHeading(cmd) {
+  const v = view; if (!S.current) return false;
+  const line = v.state.doc.lineAt(v.state.selection.main.head), m = HEADING.exec(line.text);
+  const put = (text) => { v.dispatch({ changes: { from: line.from, to: line.to, insert: text }, selection: { anchor: line.from + text.length }, userEvent: 'input' }); v.focus(); return true; };
+  if (m) return put(cmd ? `${m[1]}\\${cmd}${m[3]}{${m[4]}}` : `${m[1]}${m[4]}`);
+  if (!cmd) { v.focus(); return true; }
+  const t = line.text.trim();
+  if (t && !/^[\\%]/.test(t)) return put(`\\${cmd}{${t}}`);
+  return insertTemplate(`\\${cmd}{#{1}}`, { mode: 'text' });
+}
+
 export function insertSymbol(sym) {
   const v = view; if (!S.current) return false;
   let text = sym.i;

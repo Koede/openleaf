@@ -45,3 +45,25 @@ Set `ACCOUNTS=1` to require sign-in: every user gets a private folder (`PROJECTS
 2. On the server: `git clone https://github.com/Koede/openleaf && cd openleaf && DOMAIN=latex.example.com docker compose up -d`. Caddy fetches an HTTPS certificate automatically.
 
 LaTeX compilation executes code (shell-escape is off and file access is restricted, but it is not a hard sandbox). For a public server keep `ALLOW_SIGNUP=0` unless you trust your users, or add container-level isolation.
+
+## Formatting toolbar (Google-Docs style)
+
+The row under the editor toolbar inserts LaTeX for you. Click a control and the code is placed at the caret with a blank box
+inside it, so whatever you type next comes out formatted; press **Tab** to step out of the group. With text selected the
+selection is wrapped instead.
+
+| Control | Result |
+| --- | --- |
+| Style (Normal / Section / Subsection …) | turns the current line into `\section{…}`, swaps or removes an existing heading |
+| Font, Size, Custom size | `\textsf{…}`, `{\Large …}`, `{\fontsize{18}{21.6}\selectfont …}` |
+| B I U S x² x₂ tt, colour, highlight | `\textbf`, `\underline`, `\sout`, `\textcolor{…}`, `\hl{…}` |
+| Align, lists, quote, columns, spacing | `center` / `flushleft` / `flushright` / `justify`, `itemize` / `enumerate` (Enter adds the next `\item`), `quote`, `multicols`, `spacing` |
+| Table grid, Insert menu | tables with a box per cell, links, images, footnotes, citations, equations, title block, page break… |
+
+Packages a control needs (`xcolor`, `soul`, `ulem`, `ragged2e`, `setspace`, …) are offered with an **Add it** button.
+Shortcuts: `Ctrl+U`, `Ctrl+Shift+E/L/R/J`, `Ctrl+Shift+7/8`, `Ctrl+Alt+0…3`.
+
+## Tests
+
+`node --test test/*.test.js` runs the unit/API tests, including a benchmark for the Detexify matcher (`tools/tune-matcher.js`
+re-tunes its weights). `test/e2e/format.e2e.js` is a Playwright smoke test for the formatting bar.

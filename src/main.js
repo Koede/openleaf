@@ -10,6 +10,7 @@ import { renderTree, newFile, newFolder, entriesFromDrop, uploadEntries } from '
 import { initPanels, focusSearch } from './panels.js';
 import { connect, watch } from './ws.js';
 import './symbols.js';
+import './format.js';
 import { ensureSignedIn, signOut, changePassword } from './auth.js';
 
 const $ = (id) => document.getElementById(id);
@@ -191,7 +192,7 @@ $('settingsBtn').onclick = async () => {
 $('helpBtn').onclick = () => modal({
   title: 'Keyboard shortcuts', cancel: '', ok: 'Close', width: '460px',
   html: `<table class="keys">${[
-    [`${MOD}+Enter`, 'Recompile'], [`${MOD}+S`, 'Save now (and compile)'], [`${MOD}+Shift+K`, 'Symbols & templates palette'], ['Tab / Shift+Tab', 'Next / previous template box'], [`${MOD}+B / I / M`, 'Bold / italic / inline math'], [`${MOD}+/`, 'Toggle comment'], [`${MOD}+F`, 'Find in file'], [`${MOD}+Shift+F`, 'Search project'], [`${MOD}+Alt+J`, 'Jump from source to PDF'], ['Double-click PDF', 'Jump from PDF to source'], [`${MOD}+Space`, 'Autocomplete'],
+    [`${MOD}+Enter`, 'Recompile'], [`${MOD}+S`, 'Save now (and compile)'], [`${MOD}+Shift+K`, 'Symbols & templates palette'], ['Tab / Shift+Tab', 'Next / previous template box; Tab also steps out of a closing brace'], [`${MOD}+B / I / M`, 'Bold / italic / inline math'], [`${MOD}+U`, 'Underline'], [`${MOD}+Shift+E / L / R / J`, 'Centre / left / right / justify'], [`${MOD}+Shift+7 / 8`, 'Numbered / bulleted list'], [`${MOD}+Alt+0 / 1 / 2 / 3`, 'Normal text / section / subsection / subsubsection'], [`${MOD}+/`, 'Toggle comment'], [`${MOD}+F`, 'Find in file'], [`${MOD}+Shift+F`, 'Search project'], [`${MOD}+Alt+J`, 'Jump from source to PDF'], ['Double-click PDF', 'Jump from PDF to source'], [`${MOD}+Space`, 'Autocomplete'],
   ].map(([k, d]) => `<tr><td><kbd>${k}</kbd></td><td>${d}</td></tr>`).join('')}</table>`,
 });
 
