@@ -2,7 +2,7 @@
 // box inside it (Tab/Esc leaves the box), so whatever is typed next comes out formatted. With text selected the
 // selection is wrapped instead. Missing packages are offered through the same "Add it" toast as the symbol palette.
 import { nextSnippetField, completionStatus } from '@codemirror/autocomplete';
-import { S, bus } from './state.js';
+import { S, bus, prefs, savePrefs } from './state.js';
 import * as ed from './editor.js';
 import { checkPackage } from './symbols.js';
 import { dropdown, promptText } from './ui.js';
@@ -125,14 +125,27 @@ const tableBtn = menuButton('▦ Table ▾', 'Insert a table', 'tbl', (panel, cl
   panel.append(label, grid);
 });
 
+// the pill in the main toolbar swaps the whole toolbar for this one; the pill on its left swaps back
+const pane = $('editorPane'), pill = $('fmtPill');
+function setOpen(open, focus = true) {
+  pane.classList.toggle('fmt-open', open); pill.setAttribute('aria-expanded', String(open));
+  if (prefs.fmtOpen !== open) { prefs.fmtOpen = open; savePrefs(); }
+  if (focus) ed.view.focus();
+}
+pill.onclick = () => setOpen(true);
+const back = btn('<span class="aa">Aa</span> Format <span class="x">✕</span>', 'Close formatting and show the main toolbar', () => setOpen(false), 'pill');
+bar.addEventListener('wheel', (e) => { if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) { bar.scrollLeft += e.deltaY; e.preventDefault(); } }, { passive: false });
+
 bar.append(
-  styleSel, fontSel, sizeSel, sep(),
+  back, styleSel, fontSel, sizeSel, sep(),
   btn('<b>B</b>', 'Bold (Ctrl+B)', actions.bold), btn('<i>I</i>', 'Italic (Ctrl+I)', actions.italic), btn('<u>U</u>', 'Underline (Ctrl+U)', actions.underline), btn('<s>S</s>', 'Strikethrough', actions.strike),
   btn('x<sup>2</sup>', 'Superscript', actions.sup), btn('x<sub>2</sub>', 'Subscript', actions.sub), btn('<code>tt</code>', 'Monospace', actions.mono), colorBtn, btn('<span class="fmt-hl">ab</span>', 'Highlight', actions.highlight), sep(),
   btn(svg('left'), 'Align left (Ctrl+Shift+L)', actions.left), btn(svg('center'), 'Centre (Ctrl+Shift+E)', actions.center), btn(svg('right'), 'Align right (Ctrl+Shift+R)', actions.right), btn(svg('justify'), 'Justify (Ctrl+Shift+J)', actions.justify), sep(),
   btn(svg('bullets'), 'Bulleted list (Ctrl+Shift+8)', actions.bullets), btn(svg('numbers'), 'Numbered list (Ctrl+Shift+7)', actions.numbers), btn(svg('indent'), 'Block quote / indent', actions.indent), btn(svg('columns'), 'Two columns', actions.columns), spaceSel, sep(),
   tableBtn, insertBtn,
 );
+
+setOpen(!!prefs.fmtOpen, false);
 
 // ---------- keep the style box in sync with the line under the caret ----------
 bus.on('cursor', () => { try { styleSel.value = ed.headingAt(ed.view.state); } catch {} });

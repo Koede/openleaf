@@ -123,7 +123,15 @@ body.dropping::after{content:"Drop to upload";position:fixed;inset:8px;border:3p
 button.link{border:0;background:none;color:var(--accent);padding:2px}.auth-note{margin:4px 0 0;font-size:12px}
 
 /* ---- formatting bar (Google-Docs style) ---- */
-#fmtTools{display:flex;align-items:center;flex-wrap:wrap;gap:3px;padding:3px 8px;border-bottom:1px solid var(--border);flex:none;background:var(--panel)}
+#fmtTools{display:none;align-items:center;flex-wrap:nowrap;gap:3px;padding:4px 8px;border-bottom:1px solid var(--border);flex:none;background:var(--panel);overflow-x:auto;scrollbar-width:thin}
+#fmtTools>*{flex:none}
+#editorPane.fmt-open #editorTools{display:none}#editorPane.fmt-open #fmtTools{display:flex;animation:fmtIn .16s ease-out}
+@keyframes fmtIn{from{opacity:0;transform:translateX(-14px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){#editorPane.fmt-open #fmtTools{animation:none}}
+#editorTools .pill,#fmtTools .pill{border-radius:999px;padding:2px 12px;font-weight:600;border:1px solid var(--border)}
+#editorTools .pill:hover{border-color:var(--accent)}
+#fmtTools .pill{background:var(--accent);border-color:var(--accent);color:#fff;gap:6px;margin-right:4px}#fmtTools .pill .x{opacity:.8;font-weight:400;margin-left:2px}
+.pill .aa{font-family:Georgia,serif;font-weight:700}
 #fmtTools.disabled{opacity:.4;pointer-events:none}
 #fmtTools button{padding:2px 6px;min-width:26px;height:26px;display:inline-flex;align-items:center;justify-content:center;gap:2px}
 #fmtTools select{height:26px;max-width:132px;padding:0 4px;font:inherit;font-size:12.5px}

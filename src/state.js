@@ -1,7 +1,7 @@
 // Shared application state + a tiny event bus.
 const loadPrefs = () => { try { return JSON.parse(localStorage.getItem('ls-prefs') || '{}'); } catch { return {}; } };
 
-export const defaults = { theme: 'system', fontSize: 14, wrap: true, autoCompile: true, spellcheck: false, pdfInvert: 'auto', layout: 'split', sidebarW: 250, pdfW: 0, sideTab: 'files', fold: true, pinPalette: false, recents: [] };
+export const defaults = { theme: 'system', fontSize: 14, wrap: true, autoCompile: true, spellcheck: false, pdfInvert: 'auto', layout: 'split', sidebarW: 250, pdfW: 0, sideTab: 'files', fold: true, pinPalette: false, fmtOpen: false, recents: [] };
 export const prefs = { ...defaults, ...loadPrefs() };
 export const savePrefs = () => { try { localStorage.setItem('ls-prefs', JSON.stringify(prefs)); } catch {} bus.emit('prefs'); };
 
