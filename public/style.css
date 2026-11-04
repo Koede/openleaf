@@ -115,3 +115,9 @@ body.dropping::after{content:"Drop to upload";position:fixed;inset:8px;border:3p
 /* ---- editor: template boxes ---- */
 .cm-snippetField{background:var(--accent-soft)!important;outline:1.5px solid var(--accent);outline-offset:0;border-radius:2px;min-width:.7em;display:inline-block;min-height:1em;vertical-align:text-bottom}
 .cm-snippetFieldPosition{display:inline-block;height:1em;width:.7em;vertical-align:text-bottom;border:1.5px solid var(--accent);border-radius:2px;background:var(--accent-soft);margin:0 1px}
+
+#authScreen{position:fixed;inset:0;z-index:200;background:var(--panel);display:flex;align-items:center;justify-content:center}
+#authForm{width:min(360px,92vw);background:var(--bg);border:1px solid var(--border);border-radius:12px;box-shadow:var(--shadow);padding:26px 26px 20px;display:flex;flex-direction:column;gap:10px}
+#authForm h2{margin:0 0 4px;font-size:20px}.auth-logo{display:flex;gap:8px;align-items:center;font-weight:700;font-size:16px;margin-bottom:6px}
+#authForm .field{margin:0}#authForm input{padding:8px 10px}#authErr{color:var(--err);min-height:1.2em}#authSubmit{padding:8px}
+button.link{border:0;background:none;color:var(--accent);padding:2px}.auth-note{margin:4px 0 0;font-size:12px}

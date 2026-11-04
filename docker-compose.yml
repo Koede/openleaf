@@ -1,0 +1,22 @@
+# Usage:  DOMAIN=latex.example.com docker compose up -d
+# Point your domain's DNS A record at this machine first; Caddy then gets a TLS certificate automatically.
+services:
+  app:
+    build: .
+    restart: unless-stopped
+    environment:
+      ALLOWED_HOSTS: ${DOMAIN:?set DOMAIN, e.g. latex.example.com}
+      ALLOW_SIGNUP: ${ALLOW_SIGNUP:-1}      # 0 = invite-only (create users with tools/adduser.js)
+      MAX_PROJECTS: ${MAX_PROJECTS:-50}
+      COMPILE_TIMEOUT_MS: ${COMPILE_TIMEOUT_MS:-90000}
+    volumes: [ "openleaf-data:/data" ]
+    mem_limit: 2g
+    pids_limit: 512
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    ports: [ "80:80", "443:443" ]
+    environment: { DOMAIN: "${DOMAIN}" }
+    volumes: [ "./deploy/Caddyfile:/etc/caddy/Caddyfile:ro", "caddy-data:/data" ]
+    depends_on: [ app ]
+volumes: { openleaf-data: {}, caddy-data: {} }

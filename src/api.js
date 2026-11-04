@@ -1,4 +1,4 @@
-import { S } from './state.js';
+import { S, bus } from './state.js';
 
 export async function api(url, opts = {}) {
   const o = { ...opts, headers: { 'x-client-id': S.clientId, ...(opts.headers || {}) } };
@@ -7,6 +7,7 @@ export async function api(url, opts = {}) {
   try { r = await fetch(url, o); } catch (e) { throw new Error('Cannot reach the server — is it still running?'); }
   const ct = r.headers.get('content-type') || '';
   const data = ct.includes('json') ? await r.json() : await r.text();
+  if (r.status === 401 && data && data.auth) bus.emit('auth-required');
   if (!r.ok) throw new Error((data && data.error) || r.statusText || 'Request failed');
   return data;
 }

@@ -96,6 +96,19 @@
 <footer id="statusbar"><span id="statCursor">Ln 1, Col 1</span><span id="statMode"></span><span class="grow"></span><span id="statWords"></span><span id="statSave"></span></footer>
 
 <div id="palette" class="palette" hidden role="dialog" aria-label="Symbols and templates"></div>
+<div id="authScreen" hidden>
+  <form id="authForm" autocomplete="on">
+    <div class="auth-logo"><span class="logo">Te</span> openleaf</div>
+    <h2 id="authTitle">Sign in</h2>
+    <label class="field"><span>Username</span><input id="authUser" type="text" name="username" autocomplete="username" autocapitalize="none" spellcheck="false" required></label>
+    <label class="field"><span>Password</span><input id="authPw" type="password" name="password" autocomplete="current-password" required></label>
+    <small id="authHint" class="muted"></small>
+    <div id="authErr" role="alert"></div>
+    <button id="authSubmit" class="primary" type="submit">Sign in</button>
+    <button id="authSwitch" class="link" type="button"></button>
+    <p class="muted auth-note">Your projects are saved to your account and available wherever you sign in.</p>
+  </form>
+</div>
 <div id="toasts" aria-live="polite"></div>
 <input id="fileInput" type="file" multiple hidden>
 <input id="folderInput" type="file" webkitdirectory multiple hidden>

@@ -29,3 +29,19 @@ Binds to `127.0.0.1` only. LaTeX can run code (e.g. `.latexmkrc`), so don't expo
 - Security: host allowlist, same-origin checks, optional `AUTH_TOKEN`, symlink and zip-slip protection, no shell-escape.
 - Env: `PORT`, `HOST`, `PROJECTS_DIR`, `AUTH_TOKEN`, `COMPILE_TIMEOUT_MS`, `ALLOWED_HOSTS`.
 - `npm test` runs the backend tests. `npm run build:demo` builds `dist/standalone.html`, a server-less page (no compiling).
+
+## Accounts and hosting on your own domain
+Set `ACCOUNTS=1` to require sign-in: every user gets a private folder (`PROJECTS_DIR/<username>/`), so their `.tex` files are saved to their account and follow them across devices. Passwords are scrypt-hashed, sessions are httpOnly cookies, logins are rate-limited, and users cannot see each other's files or live events.
+
+| Variable | Default | |
+|---|---|---|
+| `ACCOUNTS` | off | `1` turns on login/registration |
+| `ALLOW_SIGNUP` | `1` | `0` = invite-only; add users with `ADD_PASSWORD=… node tools/adduser.js alice` (`--adopt` moves existing single-user projects into the account) |
+| `MAX_PROJECTS` | 50 | per-user project limit |
+| `SECURE_COOKIES` | off | `1` behind HTTPS (the Docker setup sets it) |
+
+**Deploying to a domain** (e.g. one registered at Squarespace Domains): a domain only provides DNS, so you need a server with Docker (any small VPS). Then
+1. In the domain's DNS settings add an `A` record (host `latex`, or `@`) pointing at the server's IP.
+2. On the server: `git clone https://github.com/Koede/openleaf && cd openleaf && DOMAIN=latex.example.com docker compose up -d`. Caddy fetches an HTTPS certificate automatically.
+
+LaTeX compilation executes code (shell-escape is off and file access is restricted, but it is not a hard sandbox). For a public server keep `ALLOW_SIGNUP=0` unless you trust your users, or add container-level isolation.

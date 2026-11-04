@@ -7,6 +7,7 @@ const crypto = require('crypto');
 const { Hub } = require('./hub');
 const makeRoutes = require('./routes');
 const compiler = require('./compile');
+const { Accounts } = require('./accounts');
 
 function start(opts = {}) {
   const PORT = Number(opts.port ?? process.env.PORT ?? 3000);
@@ -14,12 +15,16 @@ function start(opts = {}) {
   const ROOT = path.resolve(opts.root ?? process.env.PROJECTS_DIR ?? path.join(__dirname, '..', 'projects'));
   const TOKEN = opts.token ?? process.env.AUTH_TOKEN ?? '';
   const TIMEOUT = Number(opts.timeoutMs ?? process.env.COMPILE_TIMEOUT_MS ?? 90000);
+  const ACCOUNTS = !!(opts.accounts ?? (process.env.ACCOUNTS === '1'));
+  const MAX_PROJECTS = Number(opts.maxProjects ?? process.env.MAX_PROJECTS ?? (ACCOUNTS ? 50 : 1000));
   const loopback = ['127.0.0.1', 'localhost', '::1'].includes(HOST);
-  if (!loopback && !TOKEN) {
-    console.error(`Refusing to listen on ${HOST} without AUTH_TOKEN: LaTeX compilation executes code.\nSet AUTH_TOKEN=<secret> (and ideally put it behind HTTPS), or use HOST=127.0.0.1.`);
+  if (!loopback && !TOKEN && !ACCOUNTS) {
+    console.error(`Refusing to listen on ${HOST} without AUTH_TOKEN: LaTeX compilation executes code.\nSet AUTH_TOKEN=<secret> or ACCOUNTS=1 (and put it behind HTTPS), or use HOST=127.0.0.1.`);
     process.exit(1);
   }
   fs.mkdirSync(ROOT, { recursive: true });
+
+  const accounts = ACCOUNTS ? new Accounts(ROOT, { allowSignup: opts.allowSignup ?? process.env.ALLOW_SIGNUP !== '0', secureCookie: opts.secureCookie ?? process.env.SECURE_COOKIES === '1' }) : null;
 
   const allowedHosts = new Set(['localhost', '127.0.0.1', '[::1]', ...(process.env.ALLOWED_HOSTS || '').split(',').map((s) => s.trim()).filter(Boolean)]);
   if (!loopback) allowedHosts.add(HOST);
@@ -32,7 +37,8 @@ function start(opts = {}) {
   const hub = new Hub(ROOT, (req) => {
     if (!hostOk(req.headers.host)) return false;
     if (req.headers.origin) { try { if (new URL(req.headers.origin).host !== req.headers.host) return false; } catch { return false; } }
-    return authed(req);
+    if (!authed(req)) return false;
+    return accounts ? accounts.verifyWs(req) : true;
   });
 
   const app = express();
@@ -62,7 +68,9 @@ function start(opts = {}) {
   }
   app.use(express.json({ limit: '25mb' }));
   app.get('/favicon.ico', (q, r) => r.status(204).end());
-  app.use('/api', makeRoutes({ root: ROOT, hub, timeoutMs: TIMEOUT }));
+  if (accounts) accounts.mount(app);
+  app.use('/api', makeRoutes({ root: ROOT, hub, timeoutMs: TIMEOUT, maxProjects: MAX_PROJECTS }));
+  if (!accounts) app.get('/api/auth/me', (req, res) => res.json({ accounts: false, user: null }));
   app.use(express.static(path.join(__dirname, '..', 'public'), { etag: true, maxAge: 0 }));
   app.use('/api', (req, res) => res.status(404).json({ error: 'Not found' }));
   app.use((err, req, res, next) => {
@@ -78,7 +86,7 @@ function start(opts = {}) {
     const port = server.address().port;
     if (!opts.quiet) {
       console.log(`LaTeX Studio running at http://${HOST === '::1' ? '[::1]' : HOST}:${port}   (projects in ${ROOT})`);
-      console.log(`latexmk: ${compiler.HAVE.latexmk ? 'found' : 'MISSING — install TeX Live/MacTeX'} · synctex: ${compiler.HAVE.synctex ? 'found' : 'not found (PDF↔source jumping disabled)'}${TOKEN ? ' · auth token required' : ''}`);
+      console.log(`latexmk: ${compiler.HAVE.latexmk ? 'found' : 'MISSING — install TeX Live/MacTeX'} · synctex: ${compiler.HAVE.synctex ? 'found' : 'not found (PDF↔source jumping disabled)'}${TOKEN ? ' · auth token required' : ''}${accounts ? ` · accounts on (signup ${accounts.allowSignup ? 'open' : 'closed'})` : ''}`);
     }
     resolve({ server, hub, port, root: ROOT, close: () => new Promise((r) => { hub.wss.close(); for (const c of hub.clients) c.ws.terminate(); [...hub.watchers.keys()].forEach((p) => hub.gc(p, true)); server.close(() => r()); }) });
   }));

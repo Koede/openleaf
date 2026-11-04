@@ -11,23 +11,28 @@ const compiler = require('./compile');
 const search = require('./search');
 const { wordCount } = require('./wordcount');
 
-module.exports = function routes({ root, hub, timeoutMs }) {
+module.exports = function routes({ root, hub, timeoutMs, maxProjects = 200 }) {
   const r = express.Router();
   const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 100 * 1024 * 1024 } });
   const wrap = (fn) => (req, res, next) => Promise.resolve().then(() => fn(req, res)).catch(next);
-  const pdirOf = (req) => { const d = U.projectDir(root, req.params.p); if (!fs.existsSync(d)) throw httpErr(404, 'Project not found'); return d; };
-  const P = (req) => ({ name: req.params.p, dir: pdirOf(req) });
+  const rootOf = (req) => req.userRoot || root;
+  const keyOf = (req, n) => (req.scope || '') + n;      // hub/compiler key; prefixed by the account in multi-user mode
+  const countProjects = (req) => fs.readdirSync(rootOf(req), { withFileTypes: true }).filter((e) => e.isDirectory() && U.NAME_RE.test(e.name)).length;
+  const checkQuota = (req) => { if (countProjects(req) >= maxProjects) throw httpErr(403, `Project limit reached (${maxProjects}). Delete a project first.`); };
+  const pdirOf = (req) => { const d = U.projectDir(rootOf(req), req.params.p); if (!fs.existsSync(d)) throw httpErr(404, 'Project not found'); return d; };
+  const P = (req) => ({ name: keyOf(req, req.params.p), label: req.params.p, dir: pdirOf(req) });
   const clientId = (req) => String(req.get('x-client-id') || '').slice(0, 40);
 
   // ---------- projects ----------
   r.get('/projects', wrap((req, res) => {
-    const list = fs.readdirSync(root, { withFileTypes: true }).filter((e) => e.isDirectory() && U.NAME_RE.test(e.name))
-      .map((e) => ({ name: e.name, mtime: fs.statSync(path.join(root, e.name)).mtimeMs })).sort((a, b) => a.name.localeCompare(b.name));
+    const list = fs.readdirSync(rootOf(req), { withFileTypes: true }).filter((e) => e.isDirectory() && U.NAME_RE.test(e.name))
+      .map((e) => ({ name: e.name, mtime: fs.statSync(path.join(rootOf(req), e.name)).mtimeMs })).sort((a, b) => a.name.localeCompare(b.name));
     res.json({ projects: list.map((p) => p.name), details: list, synctex: compiler.HAVE.synctex, latexmk: compiler.HAVE.latexmk, templates: templates.list.map(({ id, name, description }) => ({ id, name, description })) });
   }));
 
   r.post('/projects', wrap((req, res) => {
-    const d = U.projectDir(root, req.body.name);
+    checkQuota(req);
+    const d = U.projectDir(rootOf(req), req.body.name);
     if (fs.existsSync(d)) throw httpErr(409, 'A project with that name already exists');
     const t = templates.list.find((x) => x.id === req.body.template) || templates.list.find((x) => x.id === 'blank');
     fs.mkdirSync(d, { recursive: true });
@@ -36,21 +41,22 @@ module.exports = function routes({ root, hub, timeoutMs }) {
   }));
 
   r.post('/projects/:p/rename', wrap((req, res) => {
-    const d = pdirOf(req); const to = U.projectDir(root, req.body.to);
+    const d = pdirOf(req); const to = U.projectDir(rootOf(req), req.body.to);
     if (fs.existsSync(to)) throw httpErr(409, 'A project with that name already exists');
-    compiler.cancel(req.params.p); hub.gc(req.params.p, true);
+    compiler.cancel(keyOf(req, req.params.p)); hub.gc(keyOf(req, req.params.p), true);
     fs.renameSync(d, to); res.json({ ok: true });
   }));
 
   r.post('/projects/:p/copy', wrap((req, res) => {
-    const d = pdirOf(req); const to = U.projectDir(root, req.body.to);
+    checkQuota(req);
+    const d = pdirOf(req); const to = U.projectDir(rootOf(req), req.body.to);
     if (fs.existsSync(to)) throw httpErr(409, 'A project with that name already exists');
     fs.cpSync(d, to, { recursive: true, filter: (src) => path.basename(src) !== U.BUILD });
     res.json({ ok: true });
   }));
 
   r.delete('/projects/:p', wrap((req, res) => {
-    const d = pdirOf(req); compiler.cancel(req.params.p); hub.gc(req.params.p, true);
+    const d = pdirOf(req); compiler.cancel(keyOf(req, req.params.p)); hub.gc(keyOf(req, req.params.p), true);
     fs.rmSync(d, { recursive: true, force: true }); res.json({ ok: true });
   }));
 
@@ -130,7 +136,8 @@ module.exports = function routes({ root, hub, timeoutMs }) {
   }));
 
   r.post('/import', upload.single('zip'), wrap((req, res) => {
-    const d = U.projectDir(root, req.body.name);
+    checkQuota(req);
+    const d = U.projectDir(rootOf(req), req.body.name);
     if (fs.existsSync(d)) throw httpErr(409, 'A project with that name already exists');
     if (!req.file) throw httpErr(400, 'No zip uploaded');
     let zip; try { zip = new AdmZip(req.file.buffer); } catch { throw httpErr(400, 'Not a valid zip file'); }
@@ -151,9 +158,9 @@ module.exports = function routes({ root, hub, timeoutMs }) {
   }));
 
   r.get('/p/:p/download.zip', wrap((req, res) => {
-    const { name, dir } = P(req); const zip = new AdmZip();
+    const { label, dir } = P(req); const zip = new AdmZip();
     for (const f of U.walkFiles(dir)) { const d = path.posix.dirname(f); zip.addFile(f, fs.readFileSync(path.join(dir, f))); void d; }
-    res.attachment(name + '.zip'); res.type('application/zip').send(zip.toBuffer());
+    res.attachment(label + '.zip'); res.type('application/zip').send(zip.toBuffer());
   }));
 
   // ---------- history ----------
@@ -208,10 +215,10 @@ module.exports = function routes({ root, hub, timeoutMs }) {
   r.post('/p/:p/clean', wrap((req, res) => { const { name, dir } = P(req); compiler.cancel(name); fs.rmSync(path.join(dir, U.BUILD), { recursive: true, force: true }); res.json({ ok: true }); }));
 
   r.get('/p/:p/output.pdf', wrap((req, res) => {
-    const { name, dir } = P(req); const f = path.join(dir, U.BUILD, 'output.pdf');
+    const { label, dir } = P(req); const f = path.join(dir, U.BUILD, 'output.pdf');
     if (!fs.existsSync(f)) throw httpErr(404, 'No PDF yet');
     res.set('Cache-Control', 'no-store');
-    if (req.query.download) res.attachment(name + '.pdf');
+    if (req.query.download) res.attachment(label + '.pdf');
     res.sendFile(f, { dotfiles: 'allow' });
   }));
   r.get('/p/:p/build-log', wrap((req, res) => {

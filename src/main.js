@@ -10,6 +10,7 @@ import { renderTree, newFile, newFolder, entriesFromDrop, uploadEntries } from '
 import { initPanels, focusSearch } from './panels.js';
 import { connect, watch } from './ws.js';
 import './symbols.js';
+import { ensureSignedIn, signOut, changePassword } from './auth.js';
 
 const $ = (id) => document.getElementById(id);
 const mac = /Mac|iPhone|iPad/.test(navigator.platform);
@@ -104,6 +105,7 @@ async function buildProjMenu() {
   add('＋ New project…', newProject); add('⬆ Import .zip…', () => $('zipInput').click());
   m.insertAdjacentHTML('beforeend', '<hr>');
   add('Rename current…', renameProject); add('Duplicate current…', copyProject); add('Delete current…', deleteProject, 'danger');
+  if (S.user) { m.insertAdjacentHTML('beforeend', '<hr>'); add('Change password…', changePassword); add(`Sign out (${S.user})`, signOut); }
 }
 projDD = dropdown($('projBtn'), $('projMenu'), { onOpen: buildProjMenu });
 
@@ -226,7 +228,10 @@ window.addEventListener('resize', () => pdf.resizeNow());
 
 // ---------- boot ----------
 async function boot() {
-  applyTheme(); applyLayout(); syncAuto(); initPanels(); connect(); renderTree();
+  applyTheme(); applyLayout(); syncAuto();
+  if (!(await ensureSignedIn()) && S.accounts) return;
+  initPanels(); connect(); renderTree();
+  if (S.user) { $('projBtn').title = `Signed in as ${S.user}`; }
   let r; try { r = await listProjects(); } catch (e) { toast(e.message, { kind: 'error', ms: 10000 }); return; }
   if (!r.latexmk) toast('latexmk not found — install TeX Live to compile.', { kind: 'warn', ms: 10000 });
   let name = decodeURIComponent(location.hash.slice(1)); try { name = name || localStorage.getItem('ls-last') || ''; } catch {}

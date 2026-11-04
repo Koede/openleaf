@@ -33,7 +33,7 @@ export function modal({ title, message, fields = [], ok = 'OK', cancel = 'Cancel
       let ctl;
       if (f.type === 'select') { ctl = document.createElement('select'); for (const o of f.options) { const op = document.createElement('option'); op.value = o.value; op.textContent = o.label; ctl.appendChild(op); } ctl.value = f.value ?? f.options[0]?.value; }
       else if (f.type === 'checkbox') { ctl = document.createElement('input'); ctl.type = 'checkbox'; ctl.checked = !!f.value; }
-      else { ctl = document.createElement('input'); ctl.type = 'text'; ctl.value = f.value ?? ''; ctl.placeholder = f.placeholder || ''; ctl.spellcheck = false; ctl.autocomplete = 'off'; }
+      else { ctl = document.createElement('input'); ctl.type = f.type === 'password' ? 'password' : 'text'; ctl.value = f.value ?? ''; ctl.placeholder = f.placeholder || ''; ctl.spellcheck = false; ctl.autocomplete = 'off'; }
       const span = document.createElement('span'); span.textContent = f.label;
       if (f.type === 'checkbox') { row.append(ctl, span); } else { row.append(span, ctl); }
       if (f.hint) { const h = document.createElement('small'); h.textContent = f.hint; row.appendChild(h); }

@@ -16,19 +16,20 @@ class Hub {
 
   attach(server) {
     server.on('upgrade', (req, socket, head) => {
-      if (!req.url.startsWith('/ws') || !this.verify(req)) { socket.destroy(); return; }
-      this.wss.handleUpgrade(req, socket, head, (ws) => this.onConnection(ws));
+      const ok = req.url.startsWith('/ws') && this.verify(req);
+      if (!ok) { socket.destroy(); return; }
+      this.wss.handleUpgrade(req, socket, head, (ws) => this.onConnection(ws, ok && ok.scope ? ok.scope : ''));
     });
   }
 
-  onConnection(ws) {
-    const c = { ws, project: null, id: null };
+  onConnection(ws, scope = '') {
+    const c = { ws, project: null, id: null, scope };      // scope = "<user>/" in account mode, so users never share watchers
     this.clients.add(c);
     ws.on('message', (data) => {
       let m; try { m = JSON.parse(data.toString()); } catch { return; }
       if (m.type === 'watch' && NAME_RE.test(m.project || '')) {
         const prev = c.project;
-        c.project = m.project; c.id = String(m.clientId || '').slice(0, 40);
+        c.project = scope + m.project; c.id = String(m.clientId || '').slice(0, 40);
         this.ensureWatcher(c.project);
         if (prev && prev !== c.project) this.gc(prev);
       }
@@ -39,8 +40,10 @@ class Hub {
   }
 
   broadcast(project, msg, exceptId) {
-    const data = JSON.stringify({ project, ...msg });
-    for (const c of this.clients) if (c.project === project && c.ws.readyState === 1 && (!exceptId || c.id !== exceptId)) c.ws.send(data);
+    for (const c of this.clients) {
+      if (c.project !== project || c.ws.readyState !== 1 || (exceptId && c.id === exceptId)) continue;
+      c.ws.send(JSON.stringify({ project: project.slice(c.scope.length), ...msg }));      // clients only ever see plain project names
+    }
   }
 
   noteWrite(project, rel, buf) { const w = this.watchers.get(project); if (w) w.known.set(rel, sha(buf)); }
