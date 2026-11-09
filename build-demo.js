@@ -8,6 +8,13 @@ const esbuild = require('esbuild'); const fs = require('fs'); const path = requi
   const b = (f) => 'data:image/png;base64,' + fs.readFileSync(f).toString('base64');
   fs.writeFileSync('src/demo-assets.js', 'export const spriteUrl=' + JSON.stringify(b('public/symbols/sprite.png')) + ';\nexport const tplUrl=' + JSON.stringify(b('public/symbols/templates.png')) + ';\n');
 }
+// Optional private default project (kept out of git): GFEX_DIR=/path/to/project node build-demo.js
+{
+  const dir = process.env.GFEX_DIR, extra = { name: process.env.GFEX_NAME || '00-project', main: process.env.GFEX_MAIN || 'main.tex', files: {} };
+  const walk = (d) => { for (const e of fs.readdirSync(d, { withFileTypes: true })) { const p = path.join(d, e.name); if (e.isDirectory()) walk(p); else if (/\.(tex|sty|cls|bib|bst|bbx|cbx|def|lbx|cfg|ist)$/i.test(e.name)) extra.files[path.relative(dir, p).split(path.sep).join('/')] = fs.readFileSync(p, 'utf8'); } };
+  if (dir) walk(dir);
+  fs.writeFileSync('src/demo-extra.json', JSON.stringify(dir ? extra : null));
+}
 const r = esbuild.buildSync({ entryPoints: ['src/demo.js'], bundle: true, format: 'esm', write: false, minify: true, target: 'es2022', loader: { '.json': 'json' }, logLevel: 'warning' });
 const js = r.outputFiles[0].text.replace(/<\/script/gi, '<\\/script');
 let html = fs.readFileSync('public/index.html', 'utf8');

@@ -1,6 +1,7 @@
 // Browser-only build: the real UI running against an in-memory "server" (no TeX, so no compiling).
 import { toast } from './ui.js';
 import templates from './demo-data.json';
+import extra from './demo-extra.json';
 import symbolsJson from './demo-symbols.json';
 import { spriteUrl, tplUrl } from './demo-assets.js';
 
@@ -10,6 +11,7 @@ window.__symUrl = (n) => (n === 'templates' ? tplUrl : spriteUrl);
 const projects = new Map();   // name -> {files:Map, settings, hist:Map, mtime}
 const mkProject = (tid) => { const t = templates.find((x) => x.id === tid) || templates.find((x) => x.id === 'blank'); return { files: new Map(Object.entries(t.files)), settings: { main: 'main.tex', engine: 'pdflatex', haltOnError: false }, hist: new Map(), mtime: Date.now() }; };
 projects.set('my-first-project', mkProject('article'));
+if (extra) projects.set(extra.name, { files: new Map(Object.entries(extra.files)), settings: { main: extra.main, engine: 'pdflatex', haltOnError: false }, hist: new Map(), mtime: Date.now() });
 
 const json = (o, status = 200) => new Response(JSON.stringify(o), { status, headers: { 'content-type': 'application/json' } });
 const err = (m, s = 400) => json({ error: m }, s);
