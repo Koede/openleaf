@@ -1,4 +1,4 @@
-FROM node:22-bookworm-slim
+FROM node:22-trixie-slim
 # TeX Live: full-ish set so most documents compile. Use texlive-full for everything (~5 GB).
 RUN apt-get update && apt-get install -y --no-install-recommends \
       latexmk texlive-latex-recommended texlive-latex-extra texlive-fonts-recommended texlive-fonts-extra \
