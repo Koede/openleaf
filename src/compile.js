@@ -77,8 +77,20 @@ bus.on('external-change', ({ path }) => { if (prefs.autoCompile && isCompileInpu
 bus.on('settings', () => compileSoon());
 
 // events from other tabs / the server
-bus.on('ws-compile-start', ({ by }) => { logBuf = ''; if (by !== S.clientId && !S.compiling) { setBusy(true); setStatus('Compiling…', 'busy'); } });
-bus.on('ws-compile-log', ({ chunk }) => { logBuf = (logBuf + chunk).slice(-200000); if (S.compiling) $('rawLog').textContent = logBuf; });
+bus.on('ws-compile-start', ({ by }) => { logBuf = ''; livePage = 0; liveStep = ''; if (by !== S.clientId && !S.compiling) { setBusy(true); setStatus('Compiling…', 'busy'); } });
+// Live progress while compiling: the highest page TeX has shipped out in the current pass,
+// and which step latexmk is on (a 160-page document can take a minute or more).
+let livePage = 0, liveStep = '';
+bus.on('ws-compile-log', ({ chunk }) => {
+  logBuf = (logBuf + chunk).slice(-200000);
+  if (!S.compiling) return;
+  $('rawLog').textContent = logBuf;
+  if (/This is (?:pdfTeX|XeTeX|LuaHBTeX|LuaTeX)/.test(chunk)) { livePage = 0; liveStep = liveStep ? 'rerun' : 'pass'; }
+  if (/This is (?:biber|BibTeX)|INFO - This is Biber/i.test(chunk)) liveStep = 'bib';
+  for (const m of chunk.matchAll(/\[(\d+)(?=[\]{<\s.]|$)/g)) if (+m[1] > livePage && +m[1] < livePage + 50) livePage = +m[1];
+  const what = liveStep === 'bib' ? 'bibliography' : livePage ? `page ${livePage}` : '';
+  setStatus(`Compiling…${what ? ' ' + what + (liveStep === 'rerun' ? ' (rerun)' : '') : ''}`, 'busy');
+});
 bus.on('ws-compiled', ({ by, result }) => { if (by !== S.clientId) applyResult(result); });
 
 // SyncTeX

@@ -40,12 +40,35 @@ function cancel(name) {
   if (j && j.proc) { j.superseded = true; try { process.kill(-j.proc.pid, 'SIGKILL'); } catch {} }
 }
 
+// Progress watchdog. A long compile is only stopped when it stops making progress, so a
+// large document can take as long as it needs while a stuck one is caught quickly.
+// Progress = TeX ships out a page it had not reached before in the current pass, opens a
+// file it had not opened in this pass, or latexmk/biber/bibtex moves on to a new step.
+// A silent loop (\def\a{\a}\a) or one that only repeats messages trips the stall timer;
+// a runaway that keeps producing pages forever is caught by the hard limit.
+function progressTracker(now = Date.now) {
+  let maxPage = 0, files = new Set(), tail = '', last = now();
+  const bump = () => { last = now(); };
+  return {
+    feed(chunk) {
+      const s = tail + chunk; tail = s.slice(-80);
+      if (/This is (?:pdfTeX|XeTeX|LuaHBTeX|LuaTeX|e?TeX)\b/.test(s)) { maxPage = 0; files = new Set(); }
+      if (/Latexmk: applying rule|Run number \d+ of rule|^INFO - |This is (?:BibTeX|biber|pdfTeX|XeTeX|LuaHBTeX|LuaTeX)/m.test(chunk)) bump();
+      for (const m of s.matchAll(/\[(\d+)(?=[\]{<\s.]|$)/g)) { const n = +m[1]; if (n > maxPage && n < maxPage + 50) { maxPage = n; bump(); } }
+      for (const m of s.matchAll(/[(<]([^\s()<>]+\.(?:tex|sty|cls|bbl|aux|toc|lof|lot|out|cfg|def|fd|clo|ldf|pdf|png|jpe?g|eps|tikz))/gi)) if (!files.has(m[1])) { files.add(m[1]); bump(); }
+    },
+    get idleMs() { return now() - last; },
+    get page() { return maxPage; },
+  };
+}
+
 const OPENIN = process.env.TEX_OPENIN === 'r' ? 'r' : 'p';
 
-async function compile({ name, pdir, main, engine, haltOnError, timeoutMs, onOutput }) {
+async function compile({ name, pdir, main, engine, haltOnError, timeoutMs, stallMs, onOutput }) {
+  const limitMs = timeoutMs || 20 * 60000, quietMs = stallMs || 120000;
   const eng = ENGINES[engine] || ENGINES.pdflatex;
   cancel(name);
-  const job = { proc: null, superseded: false, timedOut: false };
+  const job = { proc: null, superseded: false, timedOut: null };
   jobs.set(name, job);
 
   const bdir = path.join(pdir, BUILD);
@@ -64,12 +87,17 @@ async function compile({ name, pdir, main, engine, haltOnError, timeoutMs, onOut
   });
   job.proc = proc;
   let out = '';
-  const feed = (b) => { const s = b.toString(); out += s; if (onOutput) onOutput(s); };
+  const progress = progressTracker();
+  const feed = (b) => { const s = b.toString(); out += s; progress.feed(s); if (onOutput) onOutput(s); };
   proc.stdout.on('data', feed);
   proc.stderr.on('data', feed);
-  const timer = setTimeout(() => { job.timedOut = true; try { process.kill(-proc.pid, 'SIGKILL'); } catch {} }, timeoutMs);
+  const stop = (why) => { if (job.timedOut) return; job.timedOut = why; try { process.kill(-proc.pid, 'SIGKILL'); } catch {} };
+  const timer = setInterval(() => {
+    if (progress.idleMs > quietMs) stop('stalled');
+    else if (Date.now() - started > limitMs) stop('limit');
+  }, Math.min(1000, quietMs / 4));
   const code = await new Promise((r) => { proc.on('close', r); proc.on('error', () => r(-1)); });
-  clearTimeout(timer);
+  clearInterval(timer);
   if (jobs.get(name) === job) jobs.set(name, { proc: null });
   if (job.superseded) return { superseded: true };
 
@@ -79,7 +107,12 @@ async function compile({ name, pdir, main, engine, haltOnError, timeoutMs, onOut
   const pdfPath = path.join(bdir, base + '.pdf');
   const hasPdf = fs.existsSync(pdfPath);
   let issues = [...parseLog(log, main), ...parseBlg(read('.blg'))];
-  if (job.timedOut) issues.unshift({ type: 'error', file: main, line: null, message: `Compilation timed out after ${Math.round(timeoutMs / 1000)}s (infinite loop or very large document?)` });
+  const sec = (ms) => (ms >= 120000 ? `${Math.round(ms / 60000)} min` : `${Math.round(ms / 1000)} s`);
+  const lastFile = (log.match(/\((\.\/[^\s()]+\.tex)/g) || []).pop();
+  if (job.timedOut === 'stalled') issues.unshift({ type: 'error', file: main, line: null,
+    message: `Compilation stopped: no progress for ${sec(quietMs)} (no new pages, files or steps). This is almost always an infinite loop${lastFile ? `; the last file opened was ${lastFile.slice(3)}` : ''}.` });
+  if (job.timedOut === 'limit') issues.unshift({ type: 'error', file: main, line: null,
+    message: `Compilation stopped at the ${sec(limitMs)} limit while still making progress${progress.page ? ` (page ${progress.page})` : ''}. If the document really needs longer, raise COMPILE_TIMEOUT_MS on the server.` });
   if (!hasPdf && !issues.some((i) => i.type === 'error')) issues.unshift({ type: 'error', file: main, line: null, message: 'Compilation failed: ' + (out.slice(-500) || 'latexmk produced no output') });
   let pdfVersion = null;
   if (hasPdf) {
@@ -118,4 +151,4 @@ function syncView(pdir, pdfName, file, line, col) {
   return { found: true, page: Number(page), x: n('x'), y: n('y'), h: n('h'), v: n('v'), W: n('W'), H: n('H') };
 }
 
-module.exports = { compile, cancel, syncEdit, syncView, HAVE, ENGINES, syncToBuild };
+module.exports = { progressTracker, compile, cancel, syncEdit, syncView, HAVE, ENGINES, syncToBuild };

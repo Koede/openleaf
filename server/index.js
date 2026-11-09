@@ -14,7 +14,9 @@ function start(opts = {}) {
   const HOST = opts.host ?? process.env.HOST ?? '127.0.0.1';
   const ROOT = path.resolve(opts.root ?? process.env.PROJECTS_DIR ?? path.join(__dirname, '..', 'projects'));
   const TOKEN = opts.token ?? process.env.AUTH_TOKEN ?? '';
-  const TIMEOUT = Number(opts.timeoutMs ?? process.env.COMPILE_TIMEOUT_MS ?? 90000);
+  // Hard limit per compile, and how long a compile may go without progress (see compile.js).
+  const TIMEOUT = Number(opts.timeoutMs ?? process.env.COMPILE_TIMEOUT_MS ?? 20 * 60000);
+  const STALL = Number(opts.stallMs ?? process.env.COMPILE_STALL_MS ?? 120000);
   const ACCOUNTS = !!(opts.accounts ?? (process.env.ACCOUNTS === '1'));
   const MAX_PROJECTS = Number(opts.maxProjects ?? process.env.MAX_PROJECTS ?? (ACCOUNTS ? 50 : 1000));
   const loopback = ['127.0.0.1', 'localhost', '::1'].includes(HOST);
@@ -69,7 +71,7 @@ function start(opts = {}) {
   app.use(express.json({ limit: '25mb' }));
   app.get('/favicon.ico', (q, r) => r.status(204).end());
   if (accounts) accounts.mount(app);
-  app.use('/api', makeRoutes({ root: ROOT, hub, timeoutMs: TIMEOUT, maxProjects: MAX_PROJECTS }));
+  app.use('/api', makeRoutes({ root: ROOT, hub, timeoutMs: TIMEOUT, stallMs: STALL, maxProjects: MAX_PROJECTS }));
   if (!accounts) app.get('/api/auth/me', (req, res) => res.json({ accounts: false, user: null }));
   app.use(express.static(path.join(__dirname, '..', 'public'), { etag: true, maxAge: 0 }));
   app.use('/api', (req, res) => res.status(404).json({ error: 'Not found' }));

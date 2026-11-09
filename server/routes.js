@@ -11,7 +11,7 @@ const compiler = require('./compile');
 const search = require('./search');
 const { wordCount } = require('./wordcount');
 
-module.exports = function routes({ root, hub, timeoutMs, maxProjects = 200 }) {
+module.exports = function routes({ root, hub, timeoutMs, stallMs, maxProjects = 200 }) {
   const r = express.Router();
   const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 100 * 1024 * 1024 } });
   const wrap = (fn) => (req, res, next) => Promise.resolve().then(() => fn(req, res)).catch(next);
@@ -205,7 +205,7 @@ module.exports = function routes({ root, hub, timeoutMs, maxProjects = 200 }) {
     const by = clientId(req);
     hub.broadcast(name, { type: 'compile-start', by });
     const result = await compiler.compile({
-      name, pdir: dir, main, engine: b.engine || s.engine || 'pdflatex', haltOnError: b.haltOnError ?? s.haltOnError, timeoutMs,
+      name, pdir: dir, main, engine: b.engine || s.engine || 'pdflatex', haltOnError: b.haltOnError ?? s.haltOnError, timeoutMs, stallMs,
       onOutput: (chunk) => hub.broadcast(name, { type: 'compile-log', chunk, by }),
     });
     if (!result.superseded) hub.broadcast(name, { type: 'compiled', by, result });

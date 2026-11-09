@@ -12,7 +12,7 @@ Requires Node 18+ and a TeX distribution with `latexmk` (TeX Live / MacTeX / MiK
 ## Features
 - Projects are plain folders in `./projects/<name>` (override with `PROJECTS_DIR`), nested folders, `\input` / `\include` / images / `.bib` all work.
 - Edit → autosave (0.7 s) → recompile. A newer edit cancels an in-flight compile. `Ctrl/Cmd+Enter` or `Ctrl/Cmd+S` forces a compile; toggle **Auto** to compile manually.
-- Compiles with `latexmk` (pdflatex / xelatex / lualatex), BibTeX handled automatically, shell-escape off, 90 s timeout (`COMPILE_TIMEOUT_MS`).
+- Compiles with `latexmk` (pdflatex / xelatex / lualatex), BibTeX handled automatically, shell-escape off. Long documents are allowed to run as long as they keep making progress (new pages, files or latexmk/biber steps); a compile is stopped after 2 min with no progress (`COMPILE_STALL_MS`, catches infinite loops) or at a 20 min hard limit (`COMPILE_TIMEOUT_MS`). The status bar shows the page being typeset.
 - Builds in a hidden `.build/` copy so your source folders stay clean; **Clean build** wipes it.
 - Choose the main document (auto-detected from `\documentclass`); ★ marks it in the tree.
 - Issues panel (errors / warnings) with click-to-jump, error lines highlighted in the editor, raw log tab.
@@ -27,7 +27,7 @@ Binds to `127.0.0.1` only. LaTeX can run code (e.g. `.latexmkrc`), so don't expo
 - **Σ Symbols palette** (Ctrl/⌘+Shift+K): *Templates* (Mathematica-style: click derivative, vec hat, matrix… and the caret lands in a blank □ box; type, Tab to the next box; selected text is wrapped into box 1), searchable *Symbols* (588), and *Detexify* (draw a symbol, matched locally). A missing `\usepackage` is offered with one click.
 - Sidebar: Files / Outline / project Search & Replace / History (diff + restore, deleted-file recovery).
 - Security: host allowlist, same-origin checks, optional `AUTH_TOKEN`, symlink and zip-slip protection, no shell-escape.
-- Env: `PORT`, `HOST`, `PROJECTS_DIR`, `AUTH_TOKEN`, `COMPILE_TIMEOUT_MS`, `ALLOWED_HOSTS`.
+- Env: `PORT`, `HOST`, `PROJECTS_DIR`, `AUTH_TOKEN`, `COMPILE_TIMEOUT_MS`, `COMPILE_STALL_MS`, `ALLOWED_HOSTS`.
 - `npm test` runs the backend tests. `npm run build:demo` builds `dist/standalone.html`, a server-less page (no compiling).
 
 ## Accounts and hosting on your own domain

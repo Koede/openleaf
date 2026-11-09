@@ -8,7 +8,8 @@ services:
       ALLOWED_HOSTS: ${DOMAIN:?set DOMAIN, e.g. latex.example.com}
       ALLOW_SIGNUP: ${ALLOW_SIGNUP:-1}      # 0 = invite-only (create users with tools/adduser.js)
       MAX_PROJECTS: ${MAX_PROJECTS:-50}
-      COMPILE_TIMEOUT_MS: ${COMPILE_TIMEOUT_MS:-90000}
+      COMPILE_TIMEOUT_MS: ${COMPILE_TIMEOUT_MS:-1200000}  # hard limit per compile (20 min)
+      COMPILE_STALL_MS: ${COMPILE_STALL_MS:-120000}       # stop after this long with no new pages/files/steps
       TEX_OPENIN: ${TEX_OPENIN:-p}          # r = allow \input{../x} (single-user servers)
     volumes: [ "openleaf-data:/data" ]
     mem_limit: 2g
