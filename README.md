@@ -36,6 +36,7 @@ Set `ACCOUNTS=1` to require sign-in: every user gets a private folder (`PROJECTS
 | Variable | Default | |
 |---|---|---|
 | `ACCOUNTS` | off | `1` turns on login/registration |
+| `TEX_OPENIN` | `p` | TeX read policy: `p` (paranoid) rejects `..` and paths outside the project; `r` allows `\input{../x}` but lets a document read any non-dot file the server user can — only for servers where you trust every account |
 | `ALLOW_SIGNUP` | `1` | `0` = invite-only; add users with `ADD_PASSWORD=… node tools/adduser.js alice` (`--adopt` moves existing single-user projects into the account) |
 | `MAX_PROJECTS` | 50 | per-user project limit |
 | `SECURE_COOKIES` | off | `1` behind HTTPS (the Docker setup sets it) |

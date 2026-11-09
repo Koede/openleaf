@@ -40,6 +40,8 @@ function cancel(name) {
   if (j && j.proc) { j.superseded = true; try { process.kill(-j.proc.pid, 'SIGKILL'); } catch {} }
 }
 
+const OPENIN = process.env.TEX_OPENIN === 'r' ? 'r' : 'p';
+
 async function compile({ name, pdir, main, engine, haltOnError, timeoutMs, onOutput }) {
   const eng = ENGINES[engine] || ENGINES.pdflatex;
   cancel(name);
@@ -55,8 +57,10 @@ async function compile({ name, pdir, main, engine, haltOnError, timeoutMs, onOut
   const args = [eng.flag, `${eng.opt}=${texCmd}`, ...(haltOnError ? [] : ['-f']), '-interaction=nonstopmode', main];
   const proc = spawn('latexmk', args, {
     cwd: bdir, detached: true, stdio: ['ignore', 'pipe', 'pipe'],
-    // paranoid file access (like Overleaf): no reading/writing outside the project and TeX trees
-    env: { ...process.env, openout_any: 'p', openin_any: 'p', max_print_line: '1000', error_line: '254', half_error_line: '238' },
+    // Restricted file access: writes stay inside the build dir. Reads are 'p' (paranoid, the default: no
+    // paths outside the project and TeX trees, and no '..') or 'r' (TEX_OPENIN=r: '..' allowed, only
+    // dot-files blocked). Use 'r' on a single-user server whose documents \input{../other/file}.
+    env: { ...process.env, openout_any: 'p', openin_any: OPENIN, max_print_line: '1000', error_line: '254', half_error_line: '238' },
   });
   job.proc = proc;
   let out = '';

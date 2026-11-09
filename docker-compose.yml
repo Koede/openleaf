@@ -9,6 +9,7 @@ services:
       ALLOW_SIGNUP: ${ALLOW_SIGNUP:-1}      # 0 = invite-only (create users with tools/adduser.js)
       MAX_PROJECTS: ${MAX_PROJECTS:-50}
       COMPILE_TIMEOUT_MS: ${COMPILE_TIMEOUT_MS:-90000}
+      TEX_OPENIN: ${TEX_OPENIN:-p}          # r = allow \input{../x} (single-user servers)
     volumes: [ "openleaf-data:/data" ]
     mem_limit: 2g
     pids_limit: 512
