@@ -10,6 +10,7 @@ RUN npm ci
 COPY . .
 RUN node build.js
 ENV HOST=0.0.0.0 PORT=3000 PROJECTS_DIR=/data ACCOUNTS=1 SECURE_COOKIES=1
+RUN mkdir -p /data && chown node:node /data
 VOLUME /data
 EXPOSE 3000
 USER node
