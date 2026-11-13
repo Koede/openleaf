@@ -14,6 +14,8 @@ import './format.js';
 import { ensureSignedIn, signOut, changePassword } from './auth.js';
 import { initFeedback, openFeedback } from './feedback.js';
 import { saveFile } from './save.js';
+import { openRefPicker, openCitePicker, openFigureDialog } from './pickers.js';
+import './crumbs.js';
 
 const $ = (id) => document.getElementById(id);
 const mac = /Mac|iPhone|iPad/.test(navigator.platform);
@@ -57,6 +59,7 @@ $('splitR').addEventListener('dblclick', () => { prefs.pdfW = 0; savePrefs(); ap
 
 // ---------- toolbar: compile ----------
 $('compileBtn').onclick = () => compile();
+$('tbRef').onclick = openRefPicker; $('tbCite').onclick = openCitePicker; $('tbFig').onclick = openFigureDialog;
 // Recompile menu (as in Overleaf): stop, from scratch, auto compile, compile mode, error handling.
 const compileDD = dropdown($('compileMenuBtn'), $('compileMenu'), {
   onOpen: () => {
@@ -214,6 +217,7 @@ $('settingsBtn').onclick = async () => {
       { name: 'fontSize', label: 'Editor font size (px)', value: String(prefs.fontSize) },
       { name: 'wrap', label: 'Wrap long lines', type: 'checkbox', value: prefs.wrap },
       { name: 'spellcheck', label: 'Browser spell-check in editor', type: 'checkbox', value: prefs.spellcheck },
+      { name: 'crumbs', label: 'Show breadcrumbs above the editor (file › section › subsection)', type: 'checkbox', value: prefs.crumbs !== false },
       { name: 'fold', label: 'Code folding (sections, environments)', type: 'checkbox', value: prefs.fold },
       { name: 'pdfInvert', label: 'Dark PDF pages', type: 'select', value: prefs.pdfInvert, options: [{ value: 'auto', label: 'Automatic (in dark theme)' }, { value: 'on', label: 'Always' }, { value: 'off', label: 'Never' }] },
       { name: 'haltOnError', label: 'Stop at first error (this project)', type: 'checkbox', value: S.settings.haltOnError },
@@ -221,7 +225,7 @@ $('settingsBtn').onclick = async () => {
   });
   if (!v) return;
   const fs_ = Math.max(9, Math.min(32, parseInt(v.fontSize, 10) || 14));
-  Object.assign(prefs, { theme: v.theme, fontSize: fs_, wrap: v.wrap, spellcheck: v.spellcheck, fold: v.fold, pdfInvert: v.pdfInvert }); savePrefs();
+  Object.assign(prefs, { theme: v.theme, fontSize: fs_, wrap: v.wrap, spellcheck: v.spellcheck, crumbs: v.crumbs, fold: v.fold, pdfInvert: v.pdfInvert }); savePrefs();
   if (v.haltOnError !== S.settings.haltOnError) files.saveSettings({ haltOnError: v.haltOnError });
 };
 $('helpBtn').onclick = () => modal({

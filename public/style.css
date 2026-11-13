@@ -174,3 +174,19 @@ button.link{border:0;background:none;color:var(--accent);padding:2px}.auth-note{
 #fileOutline{flex:1;min-height:0;overflow:auto;padding-bottom:6px}
 .ol-item small{flex:none;max-width:45%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.ol-item .t{min-width:0;white-space:nowrap}
 .ol-item.cur{background:var(--accent-soft);color:var(--accent);font-weight:600}
+
+/* Breadcrumbs above the editor */
+#crumbs{display:flex;align-items:center;gap:2px;flex-wrap:nowrap;overflow:hidden;padding:3px 10px;font-size:12px;color:var(--muted);border-bottom:1px solid var(--border);background:var(--panel);min-height:22px;white-space:nowrap}
+#crumbs[hidden]{display:none}#crumbs .cr-file{font-weight:600;color:var(--text)}#crumbs .cr-sep{padding:0 3px}
+#crumbs .cr{border:0;background:none;padding:1px 4px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;max-width:32ch;flex:0 1 auto;min-width:3ch}#crumbs .cr:hover{color:var(--text);text-decoration:underline}#crumbs .cr.last{color:var(--text)}
+/* Toolbar icons for ref / cite / figure */
+#editorTools button.ico{display:inline-flex;align-items:center;justify-content:center;padding:4px 7px}
+/* Pickers (cross-reference, citation) and Insert figure */
+.modal.picker{width:min(720px,95vw)}.pk-row{display:flex;gap:8px;align-items:center}.pk-row .pk-q{flex:1;box-sizing:border-box;padding:7px 9px}
+.pk-list{margin-top:10px;max-height:52vh;overflow:auto;border:1px solid var(--border);border-radius:8px}
+.pk-item{display:flex;gap:10px;align-items:baseline;padding:6px 10px;cursor:pointer;border-bottom:1px solid var(--border)}.pk-item:last-child{border-bottom:0}
+.pk-item.cur{background:var(--accent-soft)}.pk-item.on{box-shadow:inset 3px 0 0 var(--accent)}.pk-item.on .pk-key::before{content:'✓ ';color:var(--accent)}
+.pk-key{flex:none;font-size:12px}.pk-kind{flex:none;font-size:11px;color:var(--muted);text-transform:lowercase}.pk-ctx{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.pk-item small{flex:none;color:var(--muted)}
+.pk-foot{display:flex;gap:8px;align-items:center;margin-top:10px}.pk-foot .grow{flex:1}.pk-hint{font-size:12px}
+.modal.fig{width:min(560px,95vw)}.modal.fig select,.modal.fig input[type=text]{box-sizing:border-box;width:100%;padding:6px 8px}.modal.fig .pk-row select{flex:1}
+.fig-prev{display:flex;justify-content:center}.fig-prev img{max-width:100%;max-height:160px;border:1px solid var(--border);border-radius:6px;margin:4px 0 8px}

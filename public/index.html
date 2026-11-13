@@ -68,12 +68,14 @@
     <div id="editorTools">
       <button id="tbUndo" title="Undo (Ctrl+Z)">↶</button><button id="tbRedo" title="Redo (Ctrl+Shift+Z)">↷</button><span class="sep"></span>
       <button id="tbBold" title="Bold (Ctrl+B)"><b>B</b></button><button id="tbItalic" title="Italic (Ctrl+I)"><i>I</i></button><button id="tbMath" title="Inline math (Ctrl+M)">$ ⁠$</button><button id="tbComment" title="Toggle comment (Ctrl+/)">%</button><span class="sep"></span>
+      <button id="tbRef" class="ico" title="Add a cross-reference (\ref)" aria-label="Add a cross-reference"><svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true"><path d="M2 3h7l4 5-4 5H2z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><circle cx="6" cy="8" r="1.3" fill="currentColor"/></svg></button><button id="tbCite" class="ico" title="Add a citation (\cite)" aria-label="Add a citation"><svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true"><path d="M3 2.5h7.5a1.5 1.5 0 0 1 1.5 1.5v9.5H4.5A1.5 1.5 0 0 1 3 12z M3 12a1.5 1.5 0 0 1 1.5-1.5H12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg></button><button id="tbFig" class="ico" title="Insert figure" aria-label="Insert figure"><svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true"><rect x="2" y="3" width="12" height="10" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.5"/><circle cx="6" cy="6.5" r="1.2" fill="currentColor"/><path d="M3 12l3.5-3.5 2.5 2.5 2-2L14 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg></button><span class="sep"></span>
       <button id="symBtn" class="sym" aria-haspopup="true" aria-expanded="false" title="Symbols, math templates and Detexify (Ctrl+Shift+K)">Σ Symbols ▾</button>
       <button id="fmtPill" class="pill" aria-expanded="false" aria-controls="fmtTools" title="Text formatting: style, font, size, alignment, lists, tables…"><span class="aa">Aa</span> Format</button>
       <span class="grow"></span>
       <button id="tbFind" title="Find in file (Ctrl+F)">Find</button><button id="tbSync" title="Jump to this line in the PDF (Ctrl+Alt+J)">→ PDF</button>
     </div>
     <div id="fmtTools" role="toolbar" aria-label="Formatting"></div>
+    <nav id="crumbs" aria-label="Location in the document" hidden></nav>
     <div id="banner" hidden></div>
     <div id="editorHost"></div>
     <div id="preview" hidden></div>

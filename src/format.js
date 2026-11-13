@@ -1,6 +1,7 @@
 // Google-Docs-style formatting toolbar. Every control inserts the LaTeX for that format at the caret with a blank
 // box inside it (Tab/Esc leaves the box), so whatever is typed next comes out formatted. With text selected the
 // selection is wrapped instead. Missing packages are offered through the same "Add it" toast as the symbol palette.
+import { openRefPicker, openCitePicker, openFigureDialog } from './pickers.js';
 import { nextSnippetField, completionStatus } from '@codemirror/autocomplete';
 import { S, bus, prefs, savePrefs } from './state.js';
 import * as ed from './editor.js';
@@ -47,10 +48,10 @@ export const actions = {
   indent: () => block('quote'),
   columns: () => block('multicols', '{2}', ['multicol'], 'Columns'),
   link: () => tpl('\\href{#{2}}{#{1}}', ['hyperref'], 'Link'),
-  image: () => tpl('\\begin{figure}[ht]\n  \\centering\n  \\includegraphics[width=0.8\\linewidth]{#{1}}\n  \\caption{#{2}}\n  \\label{fig:#{3}}\n\\end{figure}\n', ['graphicx'], 'Image'),
+  image: () => openFigureDialog(),
   footnote: () => tpl('\\footnote{#{1}}'),
-  cite: () => tpl('\\cite{#{1}}'),
-  ref: () => tpl('\\ref{#{1}}'),
+  cite: () => openCitePicker(),
+  ref: () => openRefPicker(),
   label: () => tpl('\\label{#{1}}'),
   equation: () => tpl('\\begin{equation}\n  #{1}\n  \\label{eq:#{2}}\n\\end{equation}\n'),
   display: () => tpl('\\[\n  #{1}\n\\]\n'),
