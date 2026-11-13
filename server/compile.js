@@ -64,6 +64,21 @@ function progressTracker(now = Date.now) {
 
 const OPENIN = process.env.TEX_OPENIN === 'r' ? 'r' : 'p';
 
+// "a/../b.tex" inside the project: paranoid mode rejects every ".." path, so a small preload
+// library (server/native/kpse_dotdot.c) accepts the ones that stay inside the project. The
+// Docker image builds it; elsewhere it is built here on first start if a C compiler exists.
+const DOTDOT = (() => {
+  if (process.env.TEX_DOTDOT === '0') return null;
+  const dir = path.join(__dirname, 'native'), so = path.join(dir, 'kpse_dotdot.so'), src = path.join(dir, 'kpse_dotdot.c');
+  try {
+    const stale = !fs.existsSync(so) || fs.statSync(so).mtimeMs < fs.statSync(src).mtimeMs;
+    if (stale && hasBin('cc')) spawnSync('cc', ['-shared', '-fPIC', '-O2', '-o', so, src, '-ldl'], { encoding: 'utf8' });
+    return fs.existsSync(so) ? so : null; // a prebuilt library (the Docker image) is used as is
+  } catch { return null; }
+})();
+if (DOTDOT) process.env.OPENLEAF_DOTDOT = '1';
+HAVE.dotdot = !!DOTDOT;
+
 async function compile({ name, pdir, main, engine, haltOnError, timeoutMs, stallMs, onOutput }) {
   const limitMs = timeoutMs || 20 * 60000, quietMs = stallMs || 120000;
   const eng = ENGINES[engine] || ENGINES.pdflatex;
@@ -83,7 +98,8 @@ async function compile({ name, pdir, main, engine, haltOnError, timeoutMs, stall
     // Restricted file access: writes stay inside the build dir. Reads are 'p' (paranoid, the default: no
     // paths outside the project and TeX trees, and no '..') or 'r' (TEX_OPENIN=r: '..' allowed, only
     // dot-files blocked). Use 'r' on a single-user server whose documents \input{../other/file}.
-    env: { ...process.env, openout_any: 'p', openin_any: OPENIN, max_print_line: '1000', error_line: '254', half_error_line: '238' },
+    env: { ...process.env, openout_any: 'p', openin_any: OPENIN, max_print_line: '1000', error_line: '254', half_error_line: '238',
+      ...(DOTDOT ? { LD_PRELOAD: [DOTDOT, process.env.LD_PRELOAD].filter(Boolean).join(':') } : {}) },
   });
   job.proc = proc;
   let out = '';

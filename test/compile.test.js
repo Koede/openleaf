@@ -60,3 +60,24 @@ test('compile: the hard limit still applies to a document that never ends', { sk
   const r = await compile({ name: 'cap-' + Date.now(), pdir: d, main: 'main.tex', engine: 'pdflatex', timeoutMs: 4000, stallMs: 3000 });
   assert.match(r.issues[0].message, /limit while still making progress \(page \d+\)/);
 });
+
+test('compile: "../" paths that stay inside the project work under paranoid file access', { skip: !HAVE.latexmk || !HAVE.dotdot, timeout: 60000 }, async () => {
+  const d = tmp();
+  fs.mkdirSync(path.join(d, 'chapters/a'), { recursive: true }); fs.mkdirSync(path.join(d, 'chapters/b'), { recursive: true });
+  fs.writeFileSync(path.join(d, 'chapters/b/x.tex'), 'Reached via dotdot.\n');
+  fs.writeFileSync(path.join(d, 'chapters/a/y.tex'), '\\subimport{../b/}{x.tex}\n');
+  fs.writeFileSync(path.join(d, 'main.tex'), '\\documentclass{article}\\usepackage{import}\\begin{document}\\import{chapters/a/}{y.tex}\\end{document}\n');
+  const r = await compile({ name: 'dd-' + Date.now(), pdir: d, main: 'main.tex', engine: 'pdflatex', timeoutMs: 60000, stallMs: 30000 });
+  assert.ok(r.ok, JSON.stringify(r.issues.filter((i) => i.type === 'error')));
+});
+
+test('compile: "../" that climbs out of the project is still refused, with a clear hint', { skip: !HAVE.latexmk || !HAVE.dotdot, timeout: 60000 }, async () => {
+  const d = tmp(); fs.mkdirSync(path.join(d, 'sub'));
+  fs.writeFileSync(path.join(path.dirname(d), 'outside-' + path.basename(d) + '.tex'), 'SECRET\n');
+  fs.writeFileSync(path.join(d, 'main.tex'), `\\documentclass{article}\\begin{document}\\input{sub/../../outside-${path.basename(d)}.tex}\\end{document}\n`);
+  const r = await compile({ name: 'ddout-' + Date.now(), pdir: d, main: 'main.tex', engine: 'pdflatex', timeoutMs: 60000, stallMs: 30000 });
+  const e = r.issues.find((i) => i.type === 'error' && /not found/.test(i.message));
+  assert.ok(e, 'the file outside the project was not read');
+  assert.match(e.hint, /climb out of the project/);
+  assert.ok(!/SECRET/.test(r.log.split('Output written')[0].replace(/outside-[^ ]*/g, '')) || !r.hasPdf);
+});

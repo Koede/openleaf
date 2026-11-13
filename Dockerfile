@@ -1,3 +1,9 @@
+# Small C shim that lets TeX read "a/../b.tex" paths that stay inside the project (server/native).
+FROM node:22-trixie-slim AS native
+RUN apt-get update && apt-get install -y --no-install-recommends gcc libc6-dev && rm -rf /var/lib/apt/lists/*
+COPY server/native/kpse_dotdot.c /src/
+RUN cc -shared -fPIC -O2 -Wall -o /src/kpse_dotdot.so /src/kpse_dotdot.c -ldl
+
 FROM node:22-trixie-slim
 # TeX Live: full-ish set so most documents compile. Use texlive-full for everything (~5 GB).
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -9,6 +15,7 @@ COPY package*.json ./
 RUN npm ci
 COPY . .
 RUN node build.js
+COPY --from=native /src/kpse_dotdot.so /app/server/native/kpse_dotdot.so
 ENV HOST=0.0.0.0 PORT=3000 PROJECTS_DIR=/data ACCOUNTS=1 SECURE_COOKIES=1
 RUN mkdir -p /data && chown node:node /data
 VOLUME /data

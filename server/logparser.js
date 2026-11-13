@@ -12,6 +12,7 @@ function hintFor(msg) {
   let m = /File `([^']+?)(?:\.sty|\.cls)?' not found/.exec(msg);
   if (m && /\.(sty|cls)'/.test(msg)) return `Package/class "${m[1]}" is not installed. With TeX Live try: tlmgr install ${m[1]}`;
   m = /File `([^']+)' not found/.exec(msg);
+  if (m && /(^|\/)\.\.(\/|$)/.test(m[1]) && process.env.TEX_OPENIN !== 'r' && process.env.OPENLEAF_DOTDOT === '1') return `File "${m[1]}" uses ".." to climb out of the project, which is not allowed. Paths with ".." work as long as they stay inside the project; check how many "../" the path has, and that the folder exists.`;
   if (m && /(^|\/)\.\.(\/|$)/.test(m[1]) && process.env.TEX_OPENIN !== 'r') return `File "${m[1]}" uses ".." (a parent directory). The compiler runs with paranoid file access, which rejects such paths even inside the project. Either refer to the file from the project root, or have the server admin set TEX_OPENIN=r.`;
   if (m) return `File "${m[1]}" was not found. Check the path (it is relative to the project root) and that it was uploaded.`;
   if (/Undefined control sequence/.test(msg)) return 'A command is misspelled or its package is not loaded (\\usepackage{...}).';

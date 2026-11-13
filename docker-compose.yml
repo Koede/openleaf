@@ -10,7 +10,7 @@ services:
       MAX_PROJECTS: ${MAX_PROJECTS:-50}
       COMPILE_TIMEOUT_MS: ${COMPILE_TIMEOUT_MS:-1200000}  # hard limit per compile (20 min)
       COMPILE_STALL_MS: ${COMPILE_STALL_MS:-120000}       # stop after this long with no new pages/files/steps
-      TEX_OPENIN: ${TEX_OPENIN:-p}          # r = allow \input{../x} (single-user servers)
+      TEX_OPENIN: ${TEX_OPENIN:-p}          # p: ../ inside the project works, nothing outside it
     volumes: [ "openleaf-data:/data" ]
     mem_limit: 2g
     pids_limit: 512
