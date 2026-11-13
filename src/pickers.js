@@ -3,7 +3,7 @@
 import { S, esc, flatFiles, IMG_EXT } from './state.js';
 import { view, insertTemplate } from './editor.js';
 import { checkPackage } from './symbols.js';
-import { plainTitle } from './panels.js';
+import { plainTitle, headingIn } from './panels.js';
 import { uploadEntries } from './tree.js';
 import { toast } from './ui.js';
 
@@ -20,7 +20,7 @@ export function collectLabels() {
         let context = '', kind = '';
         for (let j = i; j >= Math.max(0, i - 12); j--) {
           const l = lines[j];
-          const h = l.match(/\\(part|chapter|section|subsection|subsubsection|paragraph)\*?(?:\[[^\]]*\])?\{(.*)\}/);
+          const h = headingIn(l);
           const c = l.match(/\\caption(?:\[[^\]]*\])?\{(.*)/);
           const e = l.match(/\\begin\{(figure|table|equation|align|gather|multline|theorem|lemma|definition)\*?\}/);
           if (!context && h) { context = plainTitle(h[2]); kind = kind || h[1]; }

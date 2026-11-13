@@ -4,7 +4,11 @@ const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
 (async () => {
   const b = await chromium.launch(); const p = await b.newPage({ viewport: { width: 1500, height: 900 } });
   const errs = []; p.on('pageerror', (e) => errs.push(e.message)); p.on('console', (m) => { if (m.type() === 'error') errs.push(m.text()); });
-  await p.goto(process.env.URL || 'http://localhost:4177/'); await p.waitForSelector('#fmtPill', { timeout: 15000 }); await p.waitForTimeout(1500);
+  // works in a throwaway project of its own (the test clears and rewrites the open file)
+  const BASE = process.env.URL || 'http://localhost:4177/', NAME = 'format-e2e-' + Date.now().toString(36);
+  await p.goto(BASE); await p.waitForSelector('#fmtPill', { timeout: 15000 });
+  await p.evaluate((NAME) => fetch('/api/projects', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: NAME, template: 'blank' }) }), NAME);
+  await p.goto(BASE + '#' + NAME); await p.waitForSelector('#fmtPill', { timeout: 15000 }); await p.waitForTimeout(1500);
   const closed = await p.isVisible('#fmtTools'); await p.screenshot({ path: '/tmp/fmt-closed.png' });
   await p.click('#fmtPill'); const opened = await p.isVisible('#fmtTools') && !(await p.isVisible('#editorTools')); await p.screenshot({ path: '/tmp/fmt-open.png' });
   const doc = () => p.evaluate(() => document.querySelector('.cm-content').innerText.replace(/ /g, ' '));
@@ -41,5 +45,6 @@ const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
   if (closed || !opened || !back) { console.error('FAILED pill toggle', { closed, opened, back }); process.exitCode = 1; }
   const bad = Object.entries(want).filter(([k, v]) => out[k] !== v);
   if (bad.length || /\\begin\{center\}\n  Middle/.test(out.center) === false || !/\\item one\n  \\item two/.test(out.list) || errs.some((e) => !/404/.test(e))) { console.error('FAILED', bad.map(([k]) => k), errs); process.exitCode = 1; } else console.log('format e2e OK');
+  await p.evaluate((NAME) => fetch(`/api/projects/${NAME}`, { method: 'DELETE' }), NAME);
   await b.close();
 })();

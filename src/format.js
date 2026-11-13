@@ -130,6 +130,7 @@ const tableBtn = menuButton('▦ Table ▾', 'Insert a table', 'tbl', (panel, cl
 const pane = $('editorPane'), pill = $('fmtPill');
 function setOpen(open, focus = true) {
   pane.classList.toggle('fmt-open', open); pill.setAttribute('aria-expanded', String(open));
+  (open ? bar : $('editorTools')).prepend($('modeSwitch'));   // the Code/Visual switch stays visible in both toolbars
   if (prefs.fmtOpen !== open) { prefs.fmtOpen = open; savePrefs(); }
   if (focus) ed.view.focus();
 }

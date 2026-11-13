@@ -64,6 +64,20 @@ selection is wrapped instead.
 Packages a control needs (`xcolor`, `soul`, `ulem`, `ragged2e`, `setspace`, …) are offered with an **Add it** button.
 Shortcuts: `Ctrl+U`, `Ctrl+Shift+E/L/R/J`, `Ctrl+Shift+7/8`, `Ctrl+Alt+0…3`.
 
+## Overleaf-style editing
+
+| | |
+|---|---|
+| **Code / Visual editor** | The switch at the left of the editor toolbar. *Visual* shows a `.tex` file as formatted text: headings, bold/italic/underline/colour, bullet and numbered lists, formulas rendered with KaTeX (the project's `\newcommand`, `\def` and `\DeclareMathOperator` definitions included), figure previews (PNG/JPG and the first page of PDF figures), `\ref` / `\cite` / `\label` / `\input` chips, the preamble folded away and `\maketitle` shown as the title. The file stays plain LaTeX: markup reappears where the cursor is (click a formula to edit its source, with a live preview underneath), `Ctrl/⌘`-click a reference to jump to its label or an `\input` chip to open that file. |
+| **Recompile menu** | ▾ next to Recompile: stop the compilation, recompile from scratch, auto compile on/off, *Normal* or *Fast [draft]* mode (images drawn as boxes), stop on the first error or try to compile despite errors. |
+| **Outline** | Sidebar tab plus a resizable *File outline* under the file tree; follows `\input`, `\include`, `\import` and `\subimport`. Breadcrumbs above the editor show where the cursor is. |
+| **Insert reference / citation / figure** | Toolbar buttons: pick a label (with the heading or caption it belongs to; `\cref` offered when cleveref is loaded), pick one or more `.bib` entries (searchable by key, author, title, year), or upload a figure into `figures/` with caption and label. |
+| **PDF** | ← → arrows on the divider jump between source and PDF (SyncTeX); ▶ presents the PDF full screen one page at a time (arrows/space to move, Esc to leave). |
+| **Sharing** | *Share* (with accounts on): invite people by user name as *can edit* or *can view*, or turn on a link for either role. Shared projects appear in the project menu under *Shared with you*; viewers get a read-only editor. |
+| **Real-time co-editing** | People in the same file type together (Yjs): coloured cursors with names, presence chips in the breadcrumbs, per-person undo. The server saves the shared text, so co-edited files are never "unsaved". |
+| **Review** | Comment on a selection (threads, resolve, reopen), and *Track changes*: insertions and deletions are recorded per person and can be accepted or rejected one by one or all at once. |
+| **Chat** | A chat per project in the sidebar, with an unread badge. |
+
 ## Feedback (bug reports and feature requests)
 
 **Feedback** in the top bar opens a form with two kinds, *Bug* and *Feature request* (bugs start
@@ -83,4 +97,5 @@ error messages. It never attaches document text or the project's name.
 ## Tests
 
 `node --test test/*.test.js` runs the unit/API tests, including a benchmark for the Detexify matcher (`tools/tune-matcher.js`
-re-tunes its weights). `test/e2e/format.e2e.js` is a Playwright smoke test for the formatting bar.
+re-tunes its weights). `test/e2e/format.e2e.js` and `test/e2e/visual.e2e.js` are Playwright smoke tests for the formatting
+bar and the Visual Editor; each creates and deletes a project of its own on the running server.

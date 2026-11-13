@@ -14,7 +14,7 @@ export function connect() {
     let m; try { m = JSON.parse(ev.data); } catch { return; }
     if (m.project && m.project !== S.project) return;
     if (typeof m.type === 'string' && m.type.startsWith('y-')) bus.emit('ws-y', m);
-    else if (m.type === 'fs') onFsEvent(m);
+    else if (m.type === 'fs') { onFsEvent(m); bus.emit('ws-fs', m); }
     else if (m.type === 'compile-start') bus.emit('ws-compile-start', m);
     else if (m.type === 'compile-log') bus.emit('ws-compile-log', m);
     else if (m.type === 'compiled') bus.emit('ws-compiled', m);

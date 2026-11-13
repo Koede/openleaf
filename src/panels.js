@@ -3,6 +3,7 @@ import { S, bus, prefs, savePrefs, esc, debounce, fileName } from './state.js';
 import { api, P, fetchText } from './api.js';
 import { openFile, refreshCache, loadTree, reloadFromDisk, saveDirty } from './files.js';
 import { toast, confirmBox, timeAgo } from './ui.js';
+import { group } from './vparse.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -18,6 +19,12 @@ export function setSideTab(t) {
 // ---------- outline ----------
 const LEVELS = { part: 0, chapter: 1, section: 2, subsection: 3, subsubsection: 4, paragraph: 5 };
 const stripComments = (l) => l.replace(/(^|[^\\])%.*/, '$1');
+// [, kind, title] of a heading on this line; the title is brace-matched, so a \label after it stays out
+export function headingIn(l) {
+  const m = /\\(part|chapter|section|subsection|subsubsection|paragraph)\*?\s*(?:\[[^\]]*\])?\s*\{/.exec(l); if (!m) return null;
+  const s = m.index + m[0].length - 1, e = group(l, s, 4000);
+  return [m[0], m[1], e > 0 ? l.slice(s + 1, e - 1) : l.slice(s + 1)];
+}
 // A heading as plain text: "L1 \MET\ and Large-$R$ Jets" -> "L1 MET and Large-R Jets".
 const FORMATTING = /\\(?:textbf|textit|textsl|textsc|textrm|textsf|texttt|textup|emph|underline|mathrm|mathbf|mathit|mathsf|mathtt|mathcal|boldsymbol|ensuremath|text|mbox|hbox|protect|boldmath|unboldmath|bfseries|itshape|normalfont)\b\s*/g;
 export const plainTitle = (t) => t
@@ -49,7 +56,7 @@ function outlineOf(path, seen = new Set(), depth = 0, importDir = '') {
   for (let i = 0; i < lines.length; i++) {
     const l = stripComments(lines[i]);
     let m;
-    if ((m = l.match(/\\(part|chapter|section|subsection|subsubsection|paragraph)\*?(?:\[[^\]]*\])?\{(.*)\}/))) out.push({ lvl: LEVELS[m[1]], label: plainTitle(m[2]), file: path, line: i + 1, kind: m[1] });
+    if ((m = headingIn(l))) out.push({ lvl: LEVELS[m[1]], label: plainTitle(m[2]), file: path, line: i + 1, kind: m[1] });
     else if ((m = l.match(/\\begin\{(figure|table|algorithm)\*?\}/))) { let cap = ''; for (let j = i; j < Math.min(i + 25, lines.length); j++) { const c = lines[j].match(/\\caption(?:\[[^\]]*\])?\{(.*?)\}?\s*$/); if (c) { cap = c[1]; break; } if (/\\end\{/.test(lines[j]) && j > i) break; } out.push({ lvl: 9, label: `${m[1]}${cap ? ': ' + cap.replace(/\\[a-zA-Z]+\s*/g, '') : ''}`, file: path, line: i + 1, kind: m[1] }); }
     for (const im of l.matchAll(INCLUDE_RE)) {
       const [, cmd, a, b] = im; let hit = null, nextDir = importDir;
@@ -230,6 +237,13 @@ async function showDiff(path, ts) {
 }
 bus.on('current', () => { histSel = null; const p = $('diffPane'); if (p) p.hidden = true; if (prefs.sideTab === 'history') renderHistory(); });
 bus.on('saved', debounce(() => { if (prefs.sideTab === 'history') renderHistory(); }, 600));
+
+// Ctrl/⌘-click on an \input/\import chip in the Visual Editor opens that file
+bus.on('open-include', ({ dir, file, cmd, from }) => {
+  const importDir = dir ? normPath((cmd.startsWith('sub') ? dirOf(from || '') : '') + dir + '/') : '';
+  const hit = findIncluded(file, from || '', importDir ? importDir + '/' : '');
+  if (hit) bus.emit('goto-source', { file: hit, line: 1, column: 0 }); else toast(`Couldn't find “${file}” in the project`, { kind: 'warn' });
+});
 
 export function initPanels() {
   document.querySelectorAll('#sideTabs [data-side]').forEach((b) => (b.onclick = () => setSideTab(b.dataset.side)));

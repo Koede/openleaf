@@ -9,3 +9,4 @@ src/demo-symbols.json
 src/demo-assets.js
 src/demo-extra.json
 server/native/*.so
+public/katex/

@@ -11,6 +11,7 @@ import { oneDark } from '@codemirror/theme-one-dark';
 import { S, bus, prefs, flatFiles, IMG_EXT } from './state.js';
 import * as collab from './collab.js';
 import { ySyncAnnotation } from 'y-codemirror.next';
+import { visualExtension, isVisualPath } from './visual.js';
 
 export const External = Annotation.define();       // transactions that come from disk, not from typing
 
@@ -150,7 +151,9 @@ const autoEnd = EditorView.inputHandler.of((v, from, to, text) => {
 });
 
 // ---------- compartments / state factory ----------
-const comp = { theme: new Compartment(), wrap: new Compartment(), spell: new Compartment(), fold: new Compartment(), ro: new Compartment() };
+const comp = { theme: new Compartment(), wrap: new Compartment(), spell: new Compartment(), fold: new Compartment(), ro: new Compartment(), visual: new Compartment() };
+// Visual Editor (formatted view of .tex files); the document stays LaTeX
+const visualExt = (path) => (prefs.visual && isVisualPath(path) ? visualExtension : []);
 // Viewers of a shared project get a read-only editor
 const roExt = () => (S.role === 'view' ? [EditorState.readOnly.of(true), EditorView.editable.of(false)] : []);
 export const isDark = () => document.documentElement.dataset.theme === 'dark';
@@ -205,7 +208,7 @@ export function mkState(doc, path, opts = {}) {
       closeBrackets(), highlightSelectionMatches(), search({ top: true }), texFold, lintGutter(), indentUnit.of('  '),
       EditorState.languageData.of(() => [{ closeBrackets: { brackets: ['(', '[', '{', '$'] } }]),
       langFor(path), baseTheme,
-      comp.theme.of(themeExt()), comp.wrap.of(wrapExt()), comp.spell.of(spellExt()), comp.fold.of(foldExt()), comp.ro.of(roExt()),
+      comp.theme.of(themeExt()), comp.wrap.of(wrapExt()), comp.spell.of(spellExt()), comp.fold.of(foldExt()), comp.ro.of(roExt()), comp.visual.of(visualExt(path)),
       autocompletion({ override: [latexComplete], icons: false }),
       Prec.high(autoEnd),
       emit,
@@ -223,7 +226,7 @@ export const doFind = () => { openSearchPanel(view); };
 // Re-apply preferences that live in compartments (theme, wrapping, spellcheck, folding, font size)
 export function applyPrefs() {
   document.getElementById('editorHost').style.setProperty('--cm-font', prefs.fontSize + 'px');
-  view.dispatch({ effects: [comp.theme.reconfigure(themeExt()), comp.wrap.reconfigure(wrapExt()), comp.spell.reconfigure(spellExt()), comp.fold.reconfigure(foldExt()), comp.ro.reconfigure(roExt())] });
+  view.dispatch({ effects: [comp.theme.reconfigure(themeExt()), comp.wrap.reconfigure(wrapExt()), comp.spell.reconfigure(spellExt()), comp.fold.reconfigure(foldExt()), comp.ro.reconfigure(roExt()), comp.visual.reconfigure(visualExt(S.current))] });
 }
 export function setViewState(state) { view.setState(state); applyPrefs(); setDiagnosticsForCurrent(); }
 

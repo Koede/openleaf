@@ -1,0 +1,36 @@
+\documentclass{article}
+\usepackage{amsmath}
+\title{On $x^2$ and \emph{more}}
+\author{A. Author \and B. Bee}
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\pair}[2][0]{(#1,#2)}
+\DeclareMathOperator*{\argmax}{arg\,max}
+\AtBeginDocument{\pdfstringdefDisableCommands{\def\mathrm#1{#1}\def\MET{MET}}}
+\providecommand{\checkmark}{\ding{51}}
+\begin{document}
+\maketitle
+\section{Intro $x^2$}\label{sec:intro}
+Some \textbf{bold and \emph{it}} text, $a+b$, \cite{k1,k2} -- see \cref{sec:intro}.
+% a comment
+\begin{itemize}
+  \item First
+  \begin{enumerate}
+    \item Nested
+    \item Again
+  \end{enumerate}
+  \item Second \(\R\)
+\end{itemize}
+\begin{align}
+  a &= b \label{eq:a} \\
+  c &= d \nonumber
+\end{align}
+\begin{figure}[htbp]
+  \centering
+  \subfloat[Left]{\includegraphics[width=0.4\textwidth]{figs/plot}}
+  \caption{A plot.}
+\end{figure}
+Caf\'e 50\% ``quoted'' and \url{https://x.org}. Price \$5.
+\begin{verbatim}
+$not math$ \textbf{not bold}
+\end{verbatim}
+\end{document}

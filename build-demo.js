@@ -19,6 +19,13 @@ const r = esbuild.buildSync({ entryPoints: ['src/demo.js'], bundle: true, format
 const js = r.outputFiles[0].text.replace(/<\/script/gi, '<\\/script');
 let html = fs.readFileSync('public/index.html', 'utf8');
 const css = fs.readFileSync('public/style.css', 'utf8') + '\n#uploadBtn{display:none!important}';
+// KaTeX stylesheet with its fonts inlined (woff2 only — every current browser reads it)
+const kdir = path.join(__dirname, 'node_modules/katex/dist');
+const katexCss = fs.readFileSync(path.join(kdir, 'katex.min.css'), 'utf8').replace(/src:([^;}]*)/g, (all, list) => {
+  const m = /url\(fonts\/([^)]+\.woff2)\)/.exec(list); if (!m) return all;
+  return `src:url(data:font/woff2;base64,${fs.readFileSync(path.join(kdir, 'fonts', m[1])).toString('base64')}) format("woff2")`;
+});
+html = html.replace('<link rel="stylesheet" href="/katex/katex.min.css">', () => `<style>${katexCss}</style>`);
 html = html.replace(/<link rel="stylesheet" href="\/pdf_viewer.css">\n/, '').replace('<link rel="stylesheet" href="/style.css">', `<style>${css}</style>`).replace('<script type="module" src="/app.js"></script>', () => `<script type="module">${js}</script>`);
 fs.mkdirSync('dist', { recursive: true }); fs.writeFileSync('dist/standalone.html', html);
 console.log('dist/standalone.html', (html.length / 1024).toFixed(0) + ' KB');

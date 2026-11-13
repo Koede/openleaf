@@ -116,6 +116,18 @@ for (const id of ['syncToPdf', 'syncToCode']) $(id).addEventListener('pointerdow
 $('syncToPdf').onclick = () => bus.emit('forward-sync');
 $('syncToCode').onclick = () => pdf.syncToSource();
 $('presentBtn').onclick = () => pdf.present();
+// Code Editor / Visual Editor switch (Visual applies to .tex files)
+function renderModeSwitch() {
+  const sw = $('modeSwitch'), tex = /\.(tex|ltx)$/i.test(S.current || '');
+  for (const b of sw.querySelectorAll('button')) b.setAttribute('aria-pressed', String((b.dataset.mode === 'visual') === !!prefs.visual));
+  sw.classList.toggle('na', !tex); sw.title = tex ? '' : 'The Visual Editor works on .tex files';
+}
+$('modeSwitch').onclick = (e) => {
+  const b = e.target.closest('button'); if (!b) return;
+  const v = b.dataset.mode === 'visual'; if (v !== !!prefs.visual) { prefs.visual = v; savePrefs(); }
+  renderModeSwitch(); ed.view.focus();
+};
+bus.on('current', renderModeSwitch); renderModeSwitch();
 document.querySelectorAll('#editorTools button:not(#symBtn)').forEach((b) => b.addEventListener('mousedown', (e) => e.preventDefault()));
 
 // ---------- PDF toolbar ----------

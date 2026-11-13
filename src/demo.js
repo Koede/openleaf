@@ -78,7 +78,7 @@ async function handle(url, init = {}) {
       return json({ ok: true, changed });
     }
     if (act === 'wordcount') return json(wc(P, q.get('main') || P.settings.main || candidates(P)[0]));
-    if (act === 'compile') return json({ superseded: true });
+    if (act === 'compile') return json({ demo: true });
     if (act === 'clean') return json({ ok: true });
   }
   return err('Not available in the standalone page', 404);

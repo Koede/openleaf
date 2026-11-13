@@ -31,6 +31,7 @@ export async function compile() {
     await saveDirty(); if (my !== seq) return;
     const r = await api(`${P()}/compile`, { json: {} });
     if (r.superseded || my !== seq) return;
+    if (r.demo) { setBusy(false); setStatus('Editor only', '', 'Compiling needs the server; this standalone page is the editor'); return; }
     await applyResult(r);
   } catch (e) { if (my === seq) { setBusy(false); setStatus('Error', 'fail', e.message); toast(e.message, { kind: 'error', ms: 7000 }); } }
 }
