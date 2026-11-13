@@ -81,3 +81,28 @@ test('compile: "../" that climbs out of the project is still refused, with a cle
   assert.match(e.hint, /climb out of the project/);
   assert.ok(!/SECRET/.test(r.log.split('Output written')[0].replace(/outside-[^ ]*/g, '')) || !r.hasPdf);
 });
+
+test('compile: Fast [draft] mode draws images as boxes', { skip: !HAVE.latexmk, timeout: 60000 }, async () => {
+  const d = tmp();
+  // a 1x1 PNG
+  fs.writeFileSync(path.join(d, 'img.png'), Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFBQIAX8jx0gAAAABJRU5ErkJggg==', 'base64'));
+  fs.writeFileSync(path.join(d, 'main.tex'), '\\documentclass{article}\\usepackage{graphicx}\\begin{document}x\\includegraphics[width=2cm]{img.png}\\end{document}\n');
+  const imgs = () => fs.readFileSync(path.join(d, '.build', 'output.pdf')).toString('latin1').split('/Subtype /Image').length - 1;
+  let r = await compile({ name: 'draft-' + Date.now(), pdir: d, main: 'main.tex', engine: 'pdflatex', timeoutMs: 60000, stallMs: 30000, draft: true });
+  assert.ok(r.ok, JSON.stringify(r.issues)); assert.strictEqual(imgs(), 0, 'no image in draft mode');
+  r = await compile({ name: 'draft2-' + Date.now(), pdir: d, main: 'main.tex', engine: 'pdflatex', timeoutMs: 60000, stallMs: 30000, draft: false });
+  assert.ok(r.ok); assert.ok(imgs() >= 1, 'image back in normal mode');
+});
+
+test('compile: Stop compilation ends a running compile', { skip: !HAVE.latexmk, timeout: 60000 }, async () => {
+  const { stop } = require('../server/compile');
+  const page = '\\count255=0 \\loop\\advance\\count255 1 \\ifnum\\count255<1500000 \\repeat x\\newpage ';
+  const d = tmp(); fs.writeFileSync(path.join(d, 'main.tex'), doc(page.repeat(40)));
+  const name = 'stop-' + Date.now(); const t0 = Date.now();
+  const p = compile({ name, pdir: d, main: 'main.tex', engine: 'pdflatex', timeoutMs: 60000, stallMs: 30000 });
+  await new Promise((r) => setTimeout(r, 1500));
+  assert.strictEqual(stop(name), true);
+  const r = await p;
+  assert.strictEqual(r.stopped, true); assert.ok(Date.now() - t0 < 10000, 'stopped promptly');
+  assert.strictEqual(stop(name), false, 'nothing left to stop');
+});

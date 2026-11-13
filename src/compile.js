@@ -12,6 +12,17 @@ let seq = 0, logBuf = '';
 function setStatus(text, cls = '', title = '') { const s = $('status'); s.textContent = text; s.className = 'status ' + cls; s.title = title; }
 function setBusy(b) { $('compileBtn').classList.toggle('busy', b); $('compileBtn').querySelector('.lbl').textContent = b ? 'Compiling…' : 'Recompile'; S.compiling = b; }
 
+export async function stopCompile() {
+  if (!S.project || !S.compiling) return;
+  try { await api(`${P()}/compile/stop`, { json: {} }); } catch (e) { toast(e.message, { kind: 'error' }); }
+}
+
+export async function recompileFromScratch() {
+  if (!S.project) return;
+  try { await api(`${P()}/clean`, { method: 'POST', json: {} }); } catch (e) { toast(e.message, { kind: 'error' }); return; }
+  return compile();
+}
+
 export async function compile() {
   if (!S.project) return;
   if (!S.server.latexmk) return toast('latexmk was not found on the server. Install TeX Live (or MacTeX/MiKTeX).', { kind: 'error', ms: 8000 });
@@ -25,13 +36,18 @@ export async function compile() {
 }
 
 export async function applyResult(r) {
+  if (r.stopped) { // stopped from the Recompile menu: keep the previous PDF and result
+    setBusy(false); setStatus('Stopped', 'warn', 'Compilation was stopped; the previous PDF is still shown');
+    if (S.lastResult) bus.emit('compiled', S.lastResult);
+    return;
+  }
   setBusy(false); S.lastResult = r; S.issues = r.issues || [];
   renderIssues(r); setDiagnosticsForCurrent();
   const errs = S.issues.filter((i) => i.type === 'error').length, warns = S.issues.filter((i) => i.type === 'warning').length;
   const secs = (r.ms / 1000).toFixed(1) + 's';
   if (!r.hasPdf) setStatus(`Failed · ${errs} error${errs === 1 ? '' : 's'}`, 'fail', 'No PDF was produced');
   else if (errs) setStatus(`${errs} error${errs === 1 ? '' : 's'} · ${secs}`, 'fail', 'PDF built despite errors');
-  else setStatus(warns ? `OK · ${warns} warning${warns === 1 ? '' : 's'} · ${secs}` : `Compiled · ${secs}`, 'ok');
+  else setStatus((warns ? `OK · ${warns} warning${warns === 1 ? '' : 's'} · ${secs}` : `Compiled · ${secs}`) + (S.settings.draft ? ' · draft' : ''), 'ok', S.settings.draft ? 'Fast (draft) mode: images are shown as boxes' : '');
   $('rawLog').textContent = r.log || logBuf;
   $('pdfEmpty').textContent = r.hasPdf ? '' : 'No PDF was produced — see the Issues panel.';
   if (!r.hasPdf) $('pdfEmpty').classList.remove('hidden');

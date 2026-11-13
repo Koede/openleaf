@@ -35,6 +35,14 @@ function syncToBuild(pdir, bdir) {
   fs.writeFileSync(mf, JSON.stringify([...src]));
 }
 
+// Stop on request (Recompile menu → Stop compilation): the compile returns { stopped: true }.
+function stop(name) {
+  const j = jobs.get(name);
+  if (!j || !j.proc) return false;
+  j.stopped = true; try { process.kill(-j.proc.pid, 'SIGKILL'); } catch {}
+  return true;
+}
+
 function cancel(name) {
   const j = jobs.get(name);
   if (j && j.proc) { j.superseded = true; try { process.kill(-j.proc.pid, 'SIGKILL'); } catch {} }
@@ -79,7 +87,7 @@ const DOTDOT = (() => {
 if (DOTDOT) process.env.OPENLEAF_DOTDOT = '1';
 HAVE.dotdot = !!DOTDOT;
 
-async function compile({ name, pdir, main, engine, haltOnError, timeoutMs, stallMs, onOutput }) {
+async function compile({ name, pdir, main, engine, haltOnError, draft, timeoutMs, stallMs, onOutput }) {
   const limitMs = timeoutMs || 20 * 60000, quietMs = stallMs || 120000;
   const eng = ENGINES[engine] || ENGINES.pdflatex;
   cancel(name);
@@ -91,8 +99,16 @@ async function compile({ name, pdir, main, engine, haltOnError, timeoutMs, stall
   const started = Date.now();
   const flags = ['-interaction=nonstopmode', '-file-line-error', '-synctex=1', '-no-shell-escape'];
   if (haltOnError) flags.push('-halt-on-error');
-  const texCmd = `${eng.cmd} ${flags.join(' ')} %O %S`;
-  const args = [eng.flag, `${eng.opt}=${texCmd}`, ...(haltOnError ? [] : ['-f']), '-interaction=nonstopmode', main];
+  // Fast (draft) mode, as in Overleaf: graphicx draws boxes instead of loading images. The option is
+  // passed before the document through latexmk's pre-TeX code (%P = that code + \input{main}).
+  // latexmk only reruns when a source changed, so a change of engine or compile mode alone would
+  // leave the old PDF: remember what built it and force a full run (-g) when that differs.
+  const modeFile = path.join(bdir, '.openleaf-mode'), mode = `${engine}|${draft ? 'draft' : 'normal'}|${main}`;
+  let force = false; try { force = fs.readFileSync(modeFile, 'utf8') !== mode; } catch { force = fs.existsSync(path.join(bdir, 'output.pdf')); }
+  try { fs.writeFileSync(modeFile, mode); } catch {}
+  const texCmd = `${eng.cmd} ${flags.join(' ')} %O ${draft ? '%P' : '%S'}`;
+  const args = [eng.flag, `${eng.opt}=${texCmd}`, ...(draft ? ['-pretex=\\PassOptionsToPackage{draft}{graphicx}\\PassOptionsToPackage{draft}{graphics}'] : []),
+    ...(force ? ['-g'] : []), ...(haltOnError ? [] : ['-f']), '-interaction=nonstopmode', main];
   const proc = spawn('latexmk', args, {
     cwd: bdir, detached: true, stdio: ['ignore', 'pipe', 'pipe'],
     // Restricted file access: writes stay inside the build dir. Reads are 'p' (paranoid, the default: no
@@ -116,6 +132,7 @@ async function compile({ name, pdir, main, engine, haltOnError, timeoutMs, stall
   clearInterval(timer);
   if (jobs.get(name) === job) jobs.set(name, { proc: null });
   if (job.superseded) return { superseded: true };
+  if (job.stopped) return { stopped: true, ok: false, ms: Date.now() - started, issues: [{ type: 'warning', file: main, line: null, message: 'Compilation stopped. The previous PDF is still shown.' }] };
 
   const base = path.basename(main).replace(/\.tex$/i, '');
   const read = (ext) => { try { return fs.readFileSync(path.join(bdir, base + ext), 'utf8'); } catch { return ''; } };
@@ -167,4 +184,4 @@ function syncView(pdir, pdfName, file, line, col) {
   return { found: true, page: Number(page), x: n('x'), y: n('y'), h: n('h'), v: n('v'), W: n('W'), H: n('H') };
 }
 
-module.exports = { progressTracker, compile, cancel, syncEdit, syncView, HAVE, ENGINES, syncToBuild };
+module.exports = { progressTracker, compile, cancel, stop, syncEdit, syncView, HAVE, ENGINES, syncToBuild };

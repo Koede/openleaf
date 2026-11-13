@@ -63,13 +63,14 @@ module.exports = function routes({ root, hub, timeoutMs, stallMs, maxProjects = 
   // ---------- settings ----------
   r.get('/p/:p/settings', wrap((req, res) => {
     const { dir } = P(req); const s = U.readSettings(dir); const det = U.detectMain(dir);
-    res.json({ main: s.main && fs.existsSync(path.join(dir, s.main)) ? s.main : det.main, engine: s.engine || 'pdflatex', haltOnError: !!s.haltOnError, candidates: det.candidates });
+    res.json({ main: s.main && fs.existsSync(path.join(dir, s.main)) ? s.main : det.main, engine: s.engine || 'pdflatex', haltOnError: !!s.haltOnError, draft: !!s.draft, candidates: det.candidates });
   }));
   r.put('/p/:p/settings', wrap((req, res) => {
     const { dir } = P(req); const s = U.readSettings(dir); const b = req.body || {};
     if (b.main !== undefined) { if (b.main) { const { rel } = U.resolveIn(dir, b.main); if (!/\.tex$/i.test(rel)) throw httpErr(400, 'Main file must be .tex'); s.main = rel; } else delete s.main; }
     if (b.engine !== undefined) { if (!compiler.ENGINES[b.engine]) throw httpErr(400, 'Unknown engine'); s.engine = b.engine; }
     if (b.haltOnError !== undefined) s.haltOnError = !!b.haltOnError;
+    if (b.draft !== undefined) s.draft = !!b.draft;
     fs.writeFileSync(path.join(dir, U.SETTINGS), JSON.stringify(s, null, 2));
     res.json({ ok: true });
   }));
@@ -205,12 +206,15 @@ module.exports = function routes({ root, hub, timeoutMs, stallMs, maxProjects = 
     const by = clientId(req);
     hub.broadcast(name, { type: 'compile-start', by });
     const result = await compiler.compile({
-      name, pdir: dir, main, engine: b.engine || s.engine || 'pdflatex', haltOnError: b.haltOnError ?? s.haltOnError, timeoutMs, stallMs,
+      name, pdir: dir, main, engine: b.engine || s.engine || 'pdflatex', haltOnError: b.haltOnError ?? s.haltOnError, draft: b.draft ?? s.draft, timeoutMs, stallMs,
       onOutput: (chunk) => hub.broadcast(name, { type: 'compile-log', chunk, by }),
     });
     if (!result.superseded) hub.broadcast(name, { type: 'compiled', by, result });
     res.json(result);
   }));
+
+  // Stop a running compile; the previous PDF stays.
+  r.post('/p/:p/compile/stop', wrap((req, res) => { const { name } = P(req); res.json({ ok: true, stopped: compiler.stop(name) }); }));
 
   r.post('/p/:p/clean', wrap((req, res) => { const { name, dir } = P(req); compiler.cancel(name); fs.rmSync(path.join(dir, U.BUILD), { recursive: true, force: true }); res.json({ ok: true }); }));
 

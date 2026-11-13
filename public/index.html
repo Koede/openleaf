@@ -14,7 +14,7 @@
   <div class="sep"></div>
   <label class="sel" title="Main file to compile"><span>Main</span><select id="mainSel" aria-label="Main file"></select></label>
   <label class="sel" title="TeX engine"><span>Engine</span><select id="engineSel" aria-label="Engine"><option value="pdflatex">pdfLaTeX</option><option value="xelatex">XeLaTeX</option><option value="lualatex">LuaLaTeX</option></select></label>
-  <button id="compileBtn" class="primary" title="Recompile (Ctrl/⌘+Enter)"><span class="spin"></span><span class="lbl">Recompile</span></button>
+  <span class="split-btn"><button id="compileBtn" class="primary" title="Recompile (Ctrl/⌘+Enter)"><span class="spin"></span><span class="lbl">Recompile</span></button><button id="compileMenuBtn" class="primary caret" aria-haspopup="true" aria-expanded="false" title="Compile options" aria-label="Compile options">▾</button></span>
   <button id="autoBtn" class="toggle" aria-pressed="true" title="Compile automatically after edits">Auto</button>
   <span id="status" class="status"></span>
   <span class="grow"></span>
@@ -32,6 +32,7 @@
 
 <div id="projMenu" class="menu" hidden></div>
 <div id="dlMenu" class="menu" hidden></div>
+<div id="compileMenu" class="menu" role="menu" hidden></div>
 
 <main id="work">
   <aside id="sidebar">

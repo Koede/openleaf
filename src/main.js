@@ -5,7 +5,7 @@ import { toast, modal, promptText, confirmBox, dropdown, timeAgo } from './ui.js
 import * as ed from './editor.js';
 import * as files from './files.js';
 import * as pdf from './pdf.js';
-import { compile } from './compile.js';
+import { compile, stopCompile, recompileFromScratch } from './compile.js';
 import { renderTree, newFile, newFolder, entriesFromDrop, uploadEntries } from './tree.js';
 import { initPanels, focusSearch } from './panels.js';
 import { connect, watch } from './ws.js';
@@ -57,6 +57,33 @@ $('splitR').addEventListener('dblclick', () => { prefs.pdfW = 0; savePrefs(); ap
 
 // ---------- toolbar: compile ----------
 $('compileBtn').onclick = () => compile();
+// Recompile menu (as in Overleaf): stop, from scratch, auto compile, compile mode, error handling.
+const compileDD = dropdown($('compileMenuBtn'), $('compileMenu'), {
+  onOpen: () => {
+    const m = $('compileMenu'); m.innerHTML = '';
+    const item = (label, fn, { cls = '', disabled = false, on = null, role = 'menuitem' } = {}) => {
+      const e = document.createElement('button'); e.className = 'menu-item ' + cls + (on ? ' on' : ''); e.textContent = label; e.setAttribute('role', role);
+      if (on !== null) e.setAttribute('aria-checked', String(!!on));
+      if (disabled) e.disabled = true; else e.onclick = () => { compileDD.close(); fn(); };
+      m.appendChild(e);
+    };
+    const head = (t) => m.insertAdjacentHTML('beforeend', `<div class="menu-h">${t}</div>`);
+    item('Stop compilation', stopCompile, { disabled: !S.compiling });
+    item('Recompile from scratch', recompileFromScratch, { disabled: !S.project });
+    m.insertAdjacentHTML('beforeend', '<hr>'); head('Auto compile');
+    const setAuto = (v) => { prefs.autoCompile = v; savePrefs(); syncAuto(); };
+    item('On', () => setAuto(true), { cls: 'radio', on: prefs.autoCompile, role: 'menuitemradio' });
+    item('Off', () => setAuto(false), { cls: 'radio', on: !prefs.autoCompile, role: 'menuitemradio' });
+    head('Compile mode');
+    const setDraft = async (v) => { try { await api(`${P()}/settings`, { method: 'PUT', json: { draft: v } }); S.settings.draft = v; toast(v ? 'Fast mode: images are drawn as boxes' : 'Normal mode', { ms: 1800 }); compile(); } catch (e) { toast(e.message, { kind: 'error' }); } };
+    item('Normal', () => setDraft(false), { cls: 'radio', on: !S.settings.draft, role: 'menuitemradio' });
+    item('Fast [draft]: images as boxes', () => setDraft(true), { cls: 'radio', on: !!S.settings.draft, role: 'menuitemradio' });
+    head('Errors');
+    const setHalt = async (v) => { try { await api(`${P()}/settings`, { method: 'PUT', json: { haltOnError: v } }); S.settings.haltOnError = v; } catch (e) { toast(e.message, { kind: 'error' }); } };
+    item('Stop on first error', () => setHalt(true), { cls: 'radio', on: !!S.settings.haltOnError, role: 'menuitemradio' });
+    item('Try to compile despite errors', () => setHalt(false), { cls: 'radio', on: !S.settings.haltOnError, role: 'menuitemradio' });
+  },
+});
 $('autoBtn').onclick = () => { prefs.autoCompile = !prefs.autoCompile; savePrefs(); syncAuto(); toast(prefs.autoCompile ? 'Auto-compile on' : 'Auto-compile off', { ms: 1500 }); };
 const syncAuto = () => { $('autoBtn').classList.toggle('on', prefs.autoCompile); $('autoBtn').setAttribute('aria-pressed', prefs.autoCompile); };
 $('engineSel').onchange = (e) => files.saveSettings({ engine: e.target.value });
