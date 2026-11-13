@@ -164,3 +164,13 @@ button.link{border:0;background:none;color:var(--accent);padding:2px}.auth-note{
 .menu-item.radio.on::before{content:'●'}.menu-item.check.on::before{content:'✓'}.menu-item.radio,.menu-item.check{justify-content:flex-start;gap:6px}
 .menu-item[disabled]{opacity:.45;cursor:default}.menu-item[disabled]:hover{background:none}
 .status.warn{color:var(--warn)}
+
+/* File outline stacked under the file tree */
+#treeOutlineSplit{flex:none;height:5px;cursor:row-resize;background:transparent}#treeOutlineSplit:hover{background:var(--accent-soft)}
+#fileOutlineBox{flex:none;display:flex;flex-direction:column;min-height:0;overflow:hidden;border-top:1px solid var(--border)}
+#fileOutlineBox.closed{height:auto!important}#fileOutlineBox.closed .outline-list{display:none}
+.ol-head{flex:none;display:flex;align-items:center;gap:6px;width:100%;border:0;border-radius:0;background:none;padding:6px 10px;font-weight:600;font-size:13px;text-align:left}
+.ol-head .chev{display:inline-block;transition:transform .12s}#fileOutlineBox.closed .ol-head .chev{transform:rotate(-90deg)}
+#fileOutline{flex:1;min-height:0;overflow:auto;padding-bottom:6px}
+.ol-item small{flex:none;max-width:45%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.ol-item .t{min-width:0;white-space:nowrap}
+.ol-item.cur{background:var(--accent-soft);color:var(--accent);font-weight:600}

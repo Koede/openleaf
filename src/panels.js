@@ -17,8 +17,30 @@ export function setSideTab(t) {
 // ---------- outline ----------
 const LEVELS = { part: 0, chapter: 1, section: 2, subsection: 3, subsubsection: 4, paragraph: 5 };
 const stripComments = (l) => l.replace(/(^|[^\\])%.*/, '$1');
-function outlineOf(path, seen = new Set(), depth = 0) {
-  if (seen.has(path) || depth > 12) return [];
+// A heading as plain text: "L1 \MET\ and Large-$R$ Jets" -> "L1 MET and Large-R Jets".
+const FORMATTING = /\\(?:textbf|textit|textsl|textsc|textrm|textsf|texttt|textup|emph|underline|mathrm|mathbf|mathit|mathsf|mathtt|mathcal|boldsymbol|ensuremath|text|mbox|hbox|protect|boldmath|unboldmath|bfseries|itshape|normalfont)\b\s*/g;
+export const plainTitle = (t) => t
+  .replace(/\\(?:label|footnote|index|cite[a-z]*|ref)\{[^}]*\}/g, '')
+  .replace(/\\texorpdfstring\{(?:[^{}]|\{[^{}]*\})*\}\{([^{}]*)\}/g, '$1')
+  .replace(/\\([ ,;:!])/g, ' ').replace(/~/g, ' ').replace(/\\\\/g, ' ')
+  .replace(FORMATTING, '')
+  .replace(/\\([a-zA-Z]+)/g, '$1')
+  .replace(/[{}$]/g, '').replace(/\s+/g, ' ').trim();
+
+// "a/b/../c" -> "a/c" (paths in the project never climb above its root)
+const normPath = (p) => { const out = []; for (const seg of p.split('/')) { if (seg === '..') out.pop(); else if (seg && seg !== '.') out.push(seg); } return out.join('/'); };
+const dirOf = (p) => (p.includes('/') ? p.slice(0, p.lastIndexOf('/') + 1) : '');
+// Find an included file the way TeX would: relative to the current \import directory (the import
+// package puts it on \input@path), then the project root, then the including file's folder.
+function findIncluded(name, path, importDir) {
+  const t = name.trim().replace(/^\.\//, '');
+  for (const dir of [importDir, '', dirOf(path)]) for (const c of [t, t + '.tex']) { const n = normPath(dir + c); if (S.cache.has(n)) return n; }
+  return null;
+}
+const INCLUDE_RE = /\\(input|include|subfile|import|subimport|includefrom|subincludefrom|inputfrom|subinputfrom)\*?\{([^}]*)\}(?:\{([^}]*)\})?/g;
+
+function outlineOf(path, seen = new Set(), depth = 0, importDir = '') {
+  if (seen.has(path) || depth > 16) return [];
   seen.add(path);
   const text = S.cache.get(path); if (text == null) return [];
   const out = [];
@@ -26,30 +48,78 @@ function outlineOf(path, seen = new Set(), depth = 0) {
   for (let i = 0; i < lines.length; i++) {
     const l = stripComments(lines[i]);
     let m;
-    if ((m = l.match(/\\(part|chapter|section|subsection|subsubsection|paragraph)\*?(?:\[[^\]]*\])?\{(.*)\}/))) out.push({ lvl: LEVELS[m[1]], label: m[2].replace(/\\(?:label|footnote)\{[^}]*\}/g, '').replace(/\\[a-zA-Z]+\s*/g, '').replace(/[{}]/g, ''), file: path, line: i + 1, kind: m[1] });
+    if ((m = l.match(/\\(part|chapter|section|subsection|subsubsection|paragraph)\*?(?:\[[^\]]*\])?\{(.*)\}/))) out.push({ lvl: LEVELS[m[1]], label: plainTitle(m[2]), file: path, line: i + 1, kind: m[1] });
     else if ((m = l.match(/\\begin\{(figure|table|algorithm)\*?\}/))) { let cap = ''; for (let j = i; j < Math.min(i + 25, lines.length); j++) { const c = lines[j].match(/\\caption(?:\[[^\]]*\])?\{(.*?)\}?\s*$/); if (c) { cap = c[1]; break; } if (/\\end\{/.test(lines[j]) && j > i) break; } out.push({ lvl: 9, label: `${m[1]}${cap ? ': ' + cap.replace(/\\[a-zA-Z]+\s*/g, '') : ''}`, file: path, line: i + 1, kind: m[1] }); }
-    else if ((m = l.match(/\\(?:input|include|subfile)\{([^}]+)\}/))) {
-      let t = m[1].trim(); const cands = [t, t + '.tex'].map((x) => x.replace(/^\.\//, ''));
-      const base = path.includes('/') ? path.slice(0, path.lastIndexOf('/') + 1) : '';
-      const hit = [...cands, ...cands.map((c) => base + c)].find((c) => S.cache.has(c));
-      if (hit) { out.push({ lvl: 8, label: hit, file: path, line: i + 1, kind: 'input' }); out.push(...outlineOf(hit, seen, depth + 1)); }
+    for (const im of l.matchAll(INCLUDE_RE)) {
+      const [, cmd, a, b] = im; let hit = null, nextDir = importDir;
+      if (b !== undefined && /import|from/.test(cmd)) {
+        // \import{dir}{file}: dir from the project root; \subimport{dir}{file}: from the current import dir
+        const dir = normPath((cmd.startsWith('sub') ? importDir : '') + a.trim() + '/');
+        nextDir = dir ? dir + '/' : '';
+        hit = findIncluded(b, path, nextDir);
+        if (hit && /import/.test(cmd)) nextDir = dirOf(hit); // \import also makes later \input relative to it
+      } else if (b === undefined && !/import|from/.test(cmd)) hit = findIncluded(a, path, importDir);
+      if (hit) { out.push({ lvl: 8, label: hit, file: path, line: i + 1, kind: 'input' }); out.push(...outlineOf(hit, seen, depth + 1, nextDir)); }
     }
   }
   return out;
 }
-export function renderOutline() {
-  const box = $('outline'); if (!box || $('outlinePanel').hidden) return;
+
+// compact (the outline under the file tree): headings only, titles get the full width.
+function renderOutlineInto(box, compact = false) {
   const main = S.settings.main || [...S.cache.keys()].find((p) => p.endsWith('.tex'));
-  const items = main ? outlineOf(main) : [];
+  let items = main ? outlineOf(main) : [];
+  if (compact) items = items.filter((i) => i.lvl < 8);
+  box._items = items;
   if (!items.length) { box.innerHTML = '<div class="empty">No sections yet.<br><small>Add <code>\\section{…}</code> and they appear here.</small></div>'; return; }
   const minLvl = Math.min(...items.filter((i) => i.lvl < 8).map((i) => i.lvl), 9);
   const icon = { input: '📄', figure: '🖼', table: '▦', algorithm: '⚙' };
   box.innerHTML = '';
-  for (const it of items) {
-    const b = document.createElement('button'); b.className = 'ol-item k-' + it.kind; b.style.paddingLeft = 8 + (it.lvl < 8 ? it.lvl - minLvl : 1) * 12 + 'px';
-    b.innerHTML = `${icon[it.kind] ? `<span class="ico">${icon[it.kind]}</span>` : ''}<span class="t">${esc(it.label || '(untitled)')}</span><small>${esc(fileName(it.file))}:${it.line}</small>`;
-    b.title = `${it.file}:${it.line}`; b.onclick = () => openFile(it.file, { line: it.line, col: 0 });
+  items.forEach((it, idx) => {
+    const b = document.createElement('button'); b.className = 'ol-item k-' + it.kind; b.dataset.idx = idx; b.style.paddingLeft = 8 + (it.lvl < 8 ? it.lvl - minLvl : 1) * 12 + 'px';
+    b.innerHTML = `${icon[it.kind] ? `<span class="ico">${icon[it.kind]}</span>` : ''}<span class="t">${esc(it.label || '(untitled)')}</span>${compact ? '' : `<small>${esc(fileName(it.file))}:${it.line}</small>`}`;
+    b.title = `${it.label} (${it.file}:${it.line})`; b.onclick = () => openFile(it.file, { line: it.line, col: 0 });
     box.appendChild(b);
+  });
+  markCurrent();
+}
+export function renderOutline() {
+  if ($('outline') && !$('outlinePanel').hidden) renderOutlineInto($('outline'));
+  if ($('fileOutline') && !$('filesPanel').hidden && prefs.outlineOpen !== false) renderOutlineInto($('fileOutline'), true);
+}
+// The section the cursor is in is highlighted (the last heading above it in the current file).
+let curLine = 1;
+function markCurrent() {
+  for (const box of [$('outline'), $('fileOutline')]) {
+    if (!box || !box._items) continue;
+    let best = -1;
+    box._items.forEach((it, i) => { if (it.lvl < 8 && it.file === S.current && it.line <= curLine) best = i; });
+    box.querySelectorAll('.ol-item.cur').forEach((e) => e.classList.remove('cur'));
+    const el = best >= 0 && box.querySelector(`.ol-item[data-idx="${best}"]`);
+    if (el) { el.classList.add('cur'); if (!box.matches(':hover')) el.scrollIntoView({ block: 'nearest' }); }
+  }
+}
+bus.on('cursor', ({ line }) => { curLine = line; markCurrent(); });
+export const outlineItems = () => { const main = S.settings.main || [...S.cache.keys()].find((p) => p.endsWith('.tex')); return main ? outlineOf(main) : []; };
+
+// File outline stacked under the file tree (as in Overleaf): collapsible, with a draggable divider.
+{
+  const box = $('fileOutlineBox'), head = $('fileOutlineHead'), split = $('treeOutlineSplit');
+  if (box) {
+    const applyH = () => {
+      const open = prefs.outlineOpen !== false;
+      box.classList.toggle('closed', !open); head.setAttribute('aria-expanded', String(open)); split.hidden = !open;
+      box.style.height = open ? Math.round((prefs.outlineH || 0.4) * 100) + '%' : '';
+    };
+    applyH();
+    head.onclick = () => { prefs.outlineOpen = prefs.outlineOpen === false; savePrefs(); applyH(); renderOutline(); };
+    split.addEventListener('pointerdown', (e) => {
+      e.preventDefault(); split.setPointerCapture(e.pointerId);
+      const panel = $('filesPanel').getBoundingClientRect();
+      const move = (ev) => { prefs.outlineH = Math.min(0.85, Math.max(0.12, (panel.bottom - ev.clientY) / panel.height)); applyH(); };
+      const up = () => { split.removeEventListener('pointermove', move); split.removeEventListener('pointerup', up); savePrefs(); };
+      split.addEventListener('pointermove', move); split.addEventListener('pointerup', up);
+    });
   }
 }
 const outlineSoon = debounce(renderOutline, 250);
