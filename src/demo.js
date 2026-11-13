@@ -2,6 +2,7 @@
 import { toast } from './ui.js';
 import templates from './demo-data.json';
 import extra from './demo-extra.json';
+import { makeZip } from './zip.js';
 import symbolsJson from './demo-symbols.json';
 import { spriteUrl, tplUrl } from './demo-assets.js';
 
@@ -52,6 +53,7 @@ async function handle(url, init = {}) {
   if (parts[0] === 'p') {
     const P = projects.get(parts[1]); if (!P) return err('Project not found', 404); const act = parts.slice(2).join('/');
     if (act === 'settings') { if (method === 'PUT') { Object.assign(P.settings, body); return json({ ok: true }); } const c = candidates(P); const main = P.settings.main && P.files.has(P.settings.main) ? P.settings.main : c[0] || null; return json({ ...P.settings, main, candidates: c }); }
+    if (act === 'download.zip') return new Response(makeZip([...P.files].sort(([a], [b]) => a.localeCompare(b)).map(([name, data]) => ({ name, data }))), { headers: { 'content-type': 'application/zip' } });
     if (act === 'tree') return json({ tree: tree(P), main: candidates(P)[0] || null, candidates: candidates(P) });
     if (act === 'raw') { const f = q.get('path'); return P.files.has(f) ? text(P.files.get(f)) : err('Not found', 404); }
     if (act === 'file') { const old = P.files.get(body.path); if (old != null) snap(P, body.path, old, true); P.files.set(body.path, body.content); snap(P, body.path, body.content); P.mtime = Date.now(); return json({ ok: true }); }
@@ -89,7 +91,7 @@ window.WebSocket = FakeWS;
 
 await import('./main.js');
 document.getElementById('pdfEmpty').innerHTML = '<div><b>PDF preview needs the server</b><br>Browsers can’t run LaTeX, so this page is the editor half: files, symbols &amp; templates, Detexify, outline, search and history.<br>Run the LaTeX Studio server for live compiling.</div>';
-document.getElementById('dlBtn').hidden = true;
+// The Download menu offers the project as a .zip, built in the page (see main.js and save.js).
 document.getElementById('uploadBtn').hidden = true;
 
 const note = () => toast('Compiling needs the LaTeX Studio server — this page is the editor, symbol palette and Detexify.', { ms: 4500 });

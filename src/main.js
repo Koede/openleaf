@@ -13,6 +13,7 @@ import './symbols.js';
 import './format.js';
 import { ensureSignedIn, signOut, changePassword } from './auth.js';
 import { initFeedback, openFeedback } from './feedback.js';
+import { saveFile } from './save.js';
 
 const $ = (id) => document.getElementById(id);
 const mac = /Mac|iPhone|iPad/.test(navigator.platform);
@@ -166,6 +167,12 @@ dlDD = dropdown($('dlBtn'), $('dlMenu'), {
     const m = $('dlMenu'); m.innerHTML = '';
     const a = (label, href, extra = {}) => { const e = document.createElement('a'); e.className = 'menu-item'; e.textContent = label; e.href = href; e.download = ''; e.onclick = () => dlDD.close(); Object.assign(e, extra); m.appendChild(e); };
     const b = (label, fn) => { const e = document.createElement('button'); e.className = 'menu-item'; e.textContent = label; e.onclick = () => { dlDD.close(); fn(); }; m.appendChild(e); };
+    if (window.__DEMO) {
+      // Standalone page: no server, so the archive is built in the page and saved through saveFile.
+      b('Project (.zip)', async () => { try { const r = await fetch(`${P()}/download.zip`); await saveFile(`${S.project}.zip`, await r.blob()); } catch (e) { toast(e.message, { kind: 'error' }); } });
+      m.insertAdjacentHTML('beforeend', '<div class="menu-item muted" aria-disabled="true">PDF and compile log need the openleaf server</div>');
+      return;
+    }
     a('PDF', `${P()}/output.pdf?download=1`); a('Project (.zip)', `${P()}/download.zip`); a('Compile log', `${P()}/build-log`);
     m.insertAdjacentHTML('beforeend', '<hr>');
     b('Clean build files', async () => { try { await api(`${P()}/clean`, { method: 'POST', json: {} }); toast('Build files removed', { kind: 'ok' }); bus.emit('compile-request', { force: true }); } catch (e) { toast(e.message, { kind: 'error' }); } });
