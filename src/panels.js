@@ -12,6 +12,7 @@ export function setSideTab(t) {
   document.querySelectorAll('#sideTabs [data-side]').forEach((b) => { const on = b.dataset.side === t; b.classList.toggle('active', on); b.setAttribute('aria-selected', on); });
   document.querySelectorAll('#sidebar .side-panel').forEach((p) => (p.hidden = p.dataset.panel !== t));
   if (t === 'outline') renderOutline(); if (t === 'history') renderHistory(); if (t === 'search') $('searchQ')?.focus();
+  bus.emit('side-tab-shown', t);
 }
 
 // ---------- outline ----------
@@ -234,3 +235,4 @@ export function initPanels() {
   document.querySelectorAll('#sideTabs [data-side]').forEach((b) => (b.onclick = () => setSideTab(b.dataset.side)));
   initSearch(); setSideTab(prefs.sideTab || 'files');
 }
+bus.on('side-tab', (t) => setSideTab(t));

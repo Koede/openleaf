@@ -108,3 +108,55 @@ test('paths are checked and projects that are not shared are out of reach', asyn
   const carol = (await call('/api/auth/register', { json: { username: 'carol', password: 'long password c' } })).cookie;
   await assert.rejects(client(carol, 'alice/paper', 'main.tex'));
 });
+
+test('comments and tracked changes live in the shared document, follow edits, and survive a restart', async () => {
+  await call('/api/p/paper/file', { method: 'PUT', json: { path: 'main.tex', content: 'The quick brown fox.\n' }, cookie: alice });
+  const a = await client(alice, 'paper', 'main.tex');
+  const rp = (i, assoc) => Y.relativePositionToJSON(Y.createRelativePositionFromTypeIndex(a.text, i, assoc));
+  a.doc.transact(() => {
+    const m = new Y.Map(); const th = new Y.Array(); th.push([{ user: 'alice', text: 'colour?', ts: 1 }]);
+    m.set('from', rp(10, 0)); m.set('to', rp(15, -1)); m.set('resolved', false); m.set('by', 'alice'); m.set('ts', 1); m.set('thread', th);
+    a.doc.getMap('comments').set('c1', m);
+    a.doc.getMap('changes').set('x1', { kind: 'del', user: 'alice', ts: 2, from: rp(4, 0), to: rp(4, -1), text: 'very ' });
+  });
+  a.text.insert(0, 'Hi. ');   // moves everything 4 characters to the right
+  const file = path.join(root, 'alice', 'paper', '.review', 'main.tex.json');
+  assert.ok(await until(() => { try { const j = JSON.parse(fs.readFileSync(file, 'utf8')); return j.comments[0].from === 14 && j.comments[0].to === 19 && j.changes[0].from === 8; } catch { return false; } }), 'saved with offsets that followed the edit');
+  assert.ok(!(await call('/api/p/paper/tree', { cookie: alice })).data.tree.some((n) => n.name === '.review'), 'not shown as a project file');
+  a.ws.close();
+  // restart the server on the same folder: the review data comes back at the right place
+  await srv.close(); srv = await start({ port: 0, root, quiet: true, accounts: true }); base = `http://127.0.0.1:${srv.port}`;
+  alice = (await call('/api/auth/login', { json: { username: 'alice', password: 'long password a' } })).cookie;
+  bob = (await call('/api/auth/login', { json: { username: 'bob', password: 'long password b' } })).cookie;
+  const b2 = await client(alice, 'paper', 'main.tex');
+  const c = b2.doc.getMap('comments').get('c1');
+  const absPos = (j) => Y.createAbsolutePositionFromRelativePosition(Y.createRelativePositionFromJSON(j), b2.doc).index;
+  assert.strictEqual(b2.text.toString().slice(absPos(c.get('from')), absPos(c.get('to'))), 'brown');
+  assert.deepStrictEqual(c.get('thread').toArray(), [{ user: 'alice', text: 'colour?', ts: 1 }]);
+  assert.strictEqual(b2.doc.getMap('changes').get('x1').text, 'very ');
+  b2.ws.close();
+});
+
+test('project chat: members (viewers too) post, everyone in the project hears it', async () => {
+  await call('/api/p/paper/share/invite', { json: { user: 'bob', role: 'view' }, cookie: alice });
+  const ws = new WebSocket(base.replace('http', 'ws') + '/ws', { headers: { cookie: alice, origin: base } }); const got = [];
+  ws.on('message', (d) => got.push(JSON.parse(d))); await new Promise((r) => ws.on('open', r));
+  ws.send(JSON.stringify({ type: 'watch', project: 'paper', clientId: 'chat' })); await wait(150);
+  assert.strictEqual((await call('/api/p/alice%2Fpaper/chat', { json: { text: '  Looks good!  ' }, cookie: bob })).status, 200);
+  assert.strictEqual((await call('/api/p/alice%2Fpaper/chat', { json: { text: '   ' }, cookie: bob })).status, 400);
+  assert.ok(await until(() => got.some((m) => m.type === 'chat' && m.message.text === 'Looks good!' && m.message.user === 'bob')));
+  const list = await call('/api/p/paper/chat', { cookie: alice });
+  assert.deepStrictEqual(list.data.messages.map((m) => [m.user, m.text]), [['bob', 'Looks good!']]);
+  ws.close();
+  await call('/api/p/paper/share/invite', { json: { user: 'bob', role: 'edit' }, cookie: alice });
+});
+
+test('track changes is a project setting that reaches everyone', async () => {
+  const ws = new WebSocket(base.replace('http', 'ws') + '/ws', { headers: { cookie: bob, origin: base } }); const got = [];
+  ws.on('message', (d) => got.push(JSON.parse(d))); await new Promise((r) => ws.on('open', r));
+  ws.send(JSON.stringify({ type: 'watch', project: 'alice/paper', clientId: 'tc' })); await wait(150);
+  await call('/api/p/paper/settings', { method: 'PUT', json: { trackChanges: true }, cookie: alice });
+  assert.ok(await until(() => got.some((m) => m.type === 'settings')));
+  assert.strictEqual((await call('/api/p/alice%2Fpaper/settings', { cookie: bob })).data.trackChanges, true);
+  ws.close();
+});

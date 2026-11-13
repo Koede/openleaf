@@ -44,17 +44,51 @@ class Collab {
     if (!U.isTextFile(rel)) throw new Error('not a text file');
     const text = fs.readFileSync(abs, 'utf8');
     const ydoc = new Y.Doc(); ydoc.getText('t').insert(0, text);
-    d = { key, project, rel, dir, abs, ydoc, text: ydoc.getText('t'), conns: new Map(), saved: text, timer: null, idle: null, epoch: crypto.randomBytes(6).toString('hex') };
+    d = { key, project, rel, dir, abs, ydoc, text: ydoc.getText('t'), conns: new Map(), saved: text, timer: null, idle: null, epoch: crypto.randomBytes(6).toString('hex'), reviewFile: path.join(dir, U.REVIEW, rel + '.json'), reviewSaved: '' };
+    this.loadReview(d);
     ydoc.on('update', (update, origin) => {
       for (const [c] of d.conns) if (c !== origin && c.ws.readyState === 1) c.ws.send(JSON.stringify({ type: 'y-update', project: c.name, path: rel, update: b64(update) }));
-      if (origin !== 'disk') this.scheduleSave(d);
+      if (origin !== 'disk' && origin !== 'load') this.scheduleSave(d);
     });
     this.docs.set(key, d);
     return d;
   }
-  scheduleSave(d) { clearTimeout(d.timer); d.timer = setTimeout(() => this.save(d), SAVE_MS); }
+  // ---------- review data (comments and tracked changes) ----------
+  // In the document they are anchored with Yjs relative positions, so they move with the text; on disk
+  // they are stored as character offsets (a reloaded document has new internal ids).
+  loadReview(d) {
+    let data; try { data = JSON.parse(fs.readFileSync(d.reviewFile, 'utf8')); } catch { return; }
+    const len = d.text.length, rp = (i, assoc) => Y.relativePositionToJSON(Y.createRelativePositionFromTypeIndex(d.text, Math.max(0, Math.min(len, i | 0)), assoc));
+    d.ydoc.transact(() => {
+      const cm = d.ydoc.getMap('comments'), ch = d.ydoc.getMap('changes');
+      for (const c of data.comments || []) {
+        const m = new Y.Map(); const th = new Y.Array(); th.push((c.thread || []).map((t) => ({ user: String(t.user || ''), text: String(t.text || ''), ts: +t.ts || 0 })));
+        m.set('from', rp(c.from, 0)); m.set('to', rp(c.to, -1)); m.set('resolved', !!c.resolved); m.set('by', String(c.by || '')); m.set('ts', +c.ts || 0); m.set('thread', th);
+        cm.set(String(c.id), m);
+      }
+      for (const c of data.changes || []) ch.set(String(c.id), { kind: c.kind === 'del' ? 'del' : 'ins', user: String(c.user || ''), ts: +c.ts || 0, from: rp(c.from, 0), to: rp(c.kind === 'del' ? c.from : c.to, -1), text: String(c.text || '') });
+    }, 'load');
+    d.reviewSaved = JSON.stringify(data);
+  }
+  reviewJson(d) {
+    const abs = (j) => { try { const a = Y.createAbsolutePositionFromRelativePosition(Y.createRelativePositionFromJSON(j), d.ydoc); return a ? a.index : 0; } catch { return 0; } };
+    const comments = [...d.ydoc.getMap('comments').entries()].map(([id, m]) => ({ id, from: abs(m.get('from')), to: abs(m.get('to')), resolved: !!m.get('resolved'), by: m.get('by'), ts: m.get('ts'), thread: m.get('thread') ? m.get('thread').toArray() : [] }));
+    const changes = [...d.ydoc.getMap('changes').entries()].map(([id, c]) => ({ id, kind: c.kind, user: c.user, ts: c.ts, from: abs(c.from), to: c.kind === 'del' ? abs(c.from) : abs(c.to), text: c.kind === 'del' ? c.text : undefined }));
+    return comments.length || changes.length ? JSON.stringify({ comments, changes }) : '';
+  }
+  saveReview(d) {
+    const j = this.reviewJson(d); if (j === d.reviewSaved) return;
+    try {
+      if (j) { fs.mkdirSync(path.dirname(d.reviewFile), { recursive: true }); U.atomicWrite(d.reviewFile, j); }
+      else fs.rmSync(d.reviewFile, { force: true });
+      d.reviewSaved = j;
+    } catch {}
+  }
+
+  scheduleSave(d) { clearTimeout(d.timer); if (this.down) return this.save(d); d.timer = setTimeout(() => this.save(d), SAVE_MS); d.timer.unref?.(); }
   save(d) {
     clearTimeout(d.timer); d.timer = null;
+    this.saveReview(d);
     const text = d.text.toString(); if (text === d.saved) return;
     if (!fs.existsSync(path.dirname(d.abs))) return;   // folder deleted meanwhile
     try {
@@ -108,12 +142,12 @@ class Collab {
     const info = d.conns.get(c); if (!info) return;
     d.conns.delete(c); c.ydocs && c.ydocs.delete(d);
     if (info.aw) for (const [o] of d.conns) if (o.ws.readyState === 1) o.ws.send(JSON.stringify({ type: 'y-aw-gone', project: o.name, path: d.rel, ids: [info.aw] }));
-    if (!d.conns.size) { this.save(d); d.idle = setTimeout(() => { if (!d.conns.size) { this.save(d); this.docs.delete(d.key); } }, IDLE_MS); }
+    if (!d.conns.size) { this.save(d); if (this.down) return; d.idle = setTimeout(() => { if (!d.conns.size) { this.save(d); this.docs.delete(d.key); } }, IDLE_MS); d.idle.unref?.(); }
   }
   closed(c) { for (const d of [...(c.ydocs || [])]) this.leave(c, d); }
   // switching project on a connection: leave that project's documents
   switched(c) { for (const d of [...(c.ydocs || [])]) if (d.project !== c.project) this.leave(c, d); }
-  shutdown() { for (const d of this.docs.values()) { this.save(d); clearTimeout(d.idle); } }
+  shutdown() { this.down = true; for (const d of this.docs.values()) { this.save(d); clearTimeout(d.idle); } }
 }
 
 module.exports = { Collab, applyDiff };

@@ -18,6 +18,8 @@ export function connect() {
     else if (m.type === 'compile-start') bus.emit('ws-compile-start', m);
     else if (m.type === 'compile-log') bus.emit('ws-compile-log', m);
     else if (m.type === 'compiled') bus.emit('ws-compiled', m);
+    else if (m.type === 'chat') bus.emit('ws-chat', m);
+    else if (m.type === 'settings') bus.emit('ws-settings', m);
   };
 }
 export function watch() { if (ws && ws.readyState === 1 && S.project) ws.send(JSON.stringify({ type: 'watch', project: S.project, clientId: S.clientId })); }

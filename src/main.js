@@ -15,6 +15,8 @@ import { ensureSignedIn, signOut, changePassword } from './auth.js';
 import { initFeedback, openFeedback } from './feedback.js';
 import { saveFile } from './save.js';
 import * as collab from './collab.js';
+import { initReview } from './review.js';
+import { initChat } from './chat.js';
 import { openShare, joinFromHash } from './share.js';
 import { openRefPicker, openCitePicker, openFigureDialog } from './pickers.js';
 import './crumbs.js';
@@ -126,7 +128,7 @@ $('findNext').onclick = () => pdf.findStep(1); $('findPrev').onclick = () => pdf
 
 // ---------- status bar ----------
 bus.on('cursor', ({ line, col, sel, math }) => { $('statCursor').textContent = `Ln ${line}, Col ${col}${sel ? ` (${sel} selected)` : ''}`; $('statMode').textContent = math ? 'math mode' : ''; });
-bus.on('edit', () => ($('statSave').textContent = '● unsaved'));
+bus.on('edit', ({ collab } = {}) => { const s = $('statSave'); if (collab) { s.textContent = '● live'; s.title = 'Shared live and saved on the server as you type'; } else { s.textContent = '● unsaved'; s.title = ''; } });
 bus.on('saved', () => { $('statSave').textContent = 'saved'; setTimeout(() => !S.dirty.size && ($('statSave').textContent = ''), 1500); });
 
 // ---------- projects ----------
@@ -216,6 +218,7 @@ export async function openProject(name) {
   // show an existing PDF immediately, then recompile
   if (!window.__DEMO) pdf.load(`${P()}/output.pdf?t=${Date.now()}`, Date.now(), S.settings.main && S.settings.main.replace(/\.tex$/, '.pdf'), { quiet: true }).catch(() => {});
   if (prefs.autoCompile) bus.emit('compile-request', { force: true });
+  bus.emit('project-opened', { name });
 }
 
 // ---------- download menu ----------
@@ -299,7 +302,7 @@ window.addEventListener('resize', () => pdf.resizeNow());
 async function boot() {
   applyTheme(); applyLayout(); syncAuto();
   if (!(await ensureSignedIn()) && S.accounts) return;
-  initPanels(); connect(); renderTree(); initFeedback();
+  initPanels(); connect(); renderTree(); initFeedback(); initReview(); initChat();
   if (S.user) { $('projBtn').title = `Signed in as ${S.user}`; }
   let r; try { r = await listProjects(); } catch (e) { toast(e.message, { kind: 'error', ms: 10000 }); return; }
   if (!r.latexmk) toast('latexmk not found — install TeX Live to compile.', { kind: 'warn', ms: 10000 });

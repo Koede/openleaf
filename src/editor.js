@@ -10,6 +10,7 @@ import { lintGutter, setDiagnostics } from '@codemirror/lint';
 import { oneDark } from '@codemirror/theme-one-dark';
 import { S, bus, prefs, flatFiles, IMG_EXT } from './state.js';
 import * as collab from './collab.js';
+import { ySyncAnnotation } from 'y-codemirror.next';
 
 export const External = Annotation.define();       // transactions that come from disk, not from typing
 
@@ -173,7 +174,9 @@ const baseTheme = EditorView.theme({
 const emit = EditorView.updateListener.of((u) => {
   if (u.docChanged && !u.transactions.some((tr) => tr.annotation(External))) {
     const p = S.current;
-    if (p) { if (!S.collab.has(p)) S.dirty.add(p); S.cache.set(p, u.state.doc.toString()); bus.emit('edit', { path: p }); }
+    // remote: the change came from someone else through the shared document
+    const remote = u.transactions.some((tr) => tr.annotation(ySyncAnnotation));
+    if (p) { if (!S.collab.has(p)) S.dirty.add(p); S.cache.set(p, u.state.doc.toString()); bus.emit('edit', { path: p, remote, collab: S.collab.has(p) }); }
   }
   if (u.selectionSet || u.docChanged) {
     const h = u.state.selection.main; const l = u.state.doc.lineAt(h.head);

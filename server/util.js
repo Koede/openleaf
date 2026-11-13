@@ -6,7 +6,9 @@ const crypto = require('crypto');
 const BUILD = '.build';
 const HISTORY = '.history';
 const SETTINGS = '.studio.json';
-const HIDDEN = new Set([BUILD, HISTORY, SETTINGS]);
+const REVIEW = '.review';       // comments and tracked changes, one JSON per file
+const CHAT = '.chat.json';
+const HIDDEN = new Set([BUILD, HISTORY, SETTINGS, REVIEW, CHAT]);
 
 const NAME_RE = /^[A-Za-z0-9][A-Za-z0-9 _.\-]{0,63}$/;
 const TEXT_EXT = /\.(tex|sty|cls|bib|bst|bbl|txt|md|cfg|def|clo|dtx|ins|csv|json|tikz|pgf|ist|lbx|cbx|bbx|latexmkrc|py|sh)$/i;
@@ -89,4 +91,4 @@ const readSettings = (pdir) => {
   try { return JSON.parse(fs.readFileSync(path.join(pdir, SETTINGS), 'utf8')); } catch { return {}; }
 };
 
-module.exports = { BUILD, HISTORY, SETTINGS, HIDDEN, NAME_RE, TEXT_EXT, isTextFile, HttpError, httpErr, projectDir, cleanRel, resolveIn, walkFiles, listTree, detectMain, sha, atomicWrite, readSettings };
+module.exports = { BUILD, HISTORY, SETTINGS, REVIEW, CHAT, HIDDEN, NAME_RE, TEXT_EXT, isTextFile, HttpError, httpErr, projectDir, cleanRel, resolveIn, walkFiles, listTree, detectMain, sha, atomicWrite, readSettings };

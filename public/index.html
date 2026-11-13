@@ -38,10 +38,12 @@
 <main id="work">
   <aside id="sidebar">
     <div id="sideTabs" role="tablist">
-      <button data-side="files" role="tab" title="Files">Files</button>
-      <button data-side="outline" role="tab" title="Document outline">Outline</button>
-      <button data-side="search" role="tab" title="Search in project (Ctrl/⌘+Shift+F)">Search</button>
-      <button data-side="history" role="tab" title="File history">History</button>
+      <button data-side="files" role="tab" title="Files" aria-label="Files"><svg class="ti" viewBox="0 0 16 16" width="15" height="15" aria-hidden="true"><path d="M2 3.5h4l1.5 1.5H14v8H2z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg><span class="tl">Files</span></button>
+      <button data-side="outline" role="tab" title="Document outline" aria-label="Outline"><svg class="ti" viewBox="0 0 16 16" width="15" height="15" aria-hidden="true"><path d="M2.5 4h11M4.5 8h9M6.5 12h7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg><span class="tl">Outline</span></button>
+      <button data-side="search" role="tab" title="Search in project (Ctrl/⌘+Shift+F)" aria-label="Search"><svg class="ti" viewBox="0 0 16 16" width="15" height="15" aria-hidden="true"><circle cx="7" cy="7" r="4.2" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M10.2 10.2 13.5 13.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg><span class="tl">Search</span></button>
+      <button data-side="history" role="tab" title="File history" aria-label="History"><svg class="ti" viewBox="0 0 16 16" width="15" height="15" aria-hidden="true"><path d="M3 8a5 5 0 1 0 1.5-3.6M3 2.8v2.6h2.6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 5.2V8l2 1.4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg><span class="tl">History</span></button>
+      <button data-side="review" role="tab" title="Comments and tracked changes" aria-label="Review"><svg class="ti" viewBox="0 0 16 16" width="15" height="15" aria-hidden="true"><path d="M3 13l1-3.2L11 2.8l2.2 2.2-7 7z M9.8 4l2.2 2.2" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg><span class="tl">Review</span></button>
+      <button data-side="chat" role="tab" title="Chat with everyone in this project" aria-label="Chat"><svg class="ti" viewBox="0 0 16 16" width="15" height="15" aria-hidden="true"><path d="M2.5 3h11v7.5H7l-3 2.5v-2.5H2.5z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg><span class="tl">Chat</span><span class="tab-badge" hidden></span></button>
     </div>
     <div class="side-panel" data-panel="files" id="filesPanel">
       <div class="side-tools"><button id="newFileBtn" title="New file">＋ File</button><button id="newFolderBtn" title="New folder">＋ Folder</button><button id="uploadBtn" title="Upload files">⬆ Upload</button></div>
@@ -51,6 +53,16 @@
       <div id="fileOutlineBox"><button id="fileOutlineHead" class="ol-head" aria-expanded="true" aria-controls="fileOutline"><span class="chev">▾</span> File outline</button><div id="fileOutline" class="outline-list" role="tree" aria-label="Document outline"></div></div>
     </div>
     <div class="side-panel" data-panel="outline" id="outlinePanel" hidden><div id="outline"></div></div>
+    <div class="side-panel" data-panel="review" id="reviewPanel" hidden>
+      <div class="rv-tools"><label class="rv-switch"><input type="checkbox" id="tcToggle"> Track changes</label><span class="grow"></span><span id="rvCount" class="muted"></span></div>
+      <div class="rv-tools" id="rvAll" hidden><button id="rvAcceptAll" title="Accept every change in this file">✓ Accept all</button><button id="rvRejectAll" class="danger" title="Reject every change in this file">✕ Reject all</button></div>
+      <label class="rv-switch rv-small"><input type="checkbox" id="rvShowResolved"> Show resolved comments</label>
+      <div id="reviewList"></div>
+    </div>
+    <div class="side-panel" data-panel="chat" id="chatPanel" hidden>
+      <div id="chatList" aria-live="polite"></div>
+      <form id="chatForm"><textarea id="chatInput" rows="2" placeholder="Message everyone in this project… (Enter sends)" aria-label="Chat message"></textarea><button type="submit" class="primary">Send</button></form>
+    </div>
     <div class="side-panel" data-panel="search" id="searchPanel" hidden>
       <div class="search-box">
         <div class="row"><input id="searchQ" type="search" placeholder="Search in project" autocomplete="off" spellcheck="false" aria-label="Search">
@@ -69,7 +81,7 @@
     <div id="editorTools">
       <button id="tbUndo" title="Undo (Ctrl+Z)">↶</button><button id="tbRedo" title="Redo (Ctrl+Shift+Z)">↷</button><span class="sep"></span>
       <button id="tbBold" title="Bold (Ctrl+B)"><b>B</b></button><button id="tbItalic" title="Italic (Ctrl+I)"><i>I</i></button><button id="tbMath" title="Inline math (Ctrl+M)">$ ⁠$</button><button id="tbComment" title="Toggle comment (Ctrl+/)">%</button><span class="sep"></span>
-      <button id="tbRef" class="ico" title="Add a cross-reference (\ref)" aria-label="Add a cross-reference"><svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true"><path d="M2 3h7l4 5-4 5H2z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><circle cx="6" cy="8" r="1.3" fill="currentColor"/></svg></button><button id="tbCite" class="ico" title="Add a citation (\cite)" aria-label="Add a citation"><svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true"><path d="M3 2.5h7.5a1.5 1.5 0 0 1 1.5 1.5v9.5H4.5A1.5 1.5 0 0 1 3 12z M3 12a1.5 1.5 0 0 1 1.5-1.5H12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg></button><button id="tbFig" class="ico" title="Insert figure" aria-label="Insert figure"><svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true"><rect x="2" y="3" width="12" height="10" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.5"/><circle cx="6" cy="6.5" r="1.2" fill="currentColor"/><path d="M3 12l3.5-3.5 2.5 2.5 2-2L14 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg></button><span class="sep"></span>
+      <button id="tbRef" class="ico" title="Add a cross-reference (\ref)" aria-label="Add a cross-reference"><svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true"><path d="M2 3h7l4 5-4 5H2z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><circle cx="6" cy="8" r="1.3" fill="currentColor"/></svg></button><button id="tbCite" class="ico" title="Add a citation (\cite)" aria-label="Add a citation"><svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true"><path d="M3 2.5h7.5a1.5 1.5 0 0 1 1.5 1.5v9.5H4.5A1.5 1.5 0 0 1 3 12z M3 12a1.5 1.5 0 0 1 1.5-1.5H12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg></button><button id="tbCommentAdd" class="ico" title="Comment on the selected text" aria-label="Add comment"><svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true"><path d="M2.5 3h11v7.5H7l-3 2.5v-2.5H2.5z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg></button><button id="tbFig" class="ico" title="Insert figure" aria-label="Insert figure"><svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true"><rect x="2" y="3" width="12" height="10" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.5"/><circle cx="6" cy="6.5" r="1.2" fill="currentColor"/><path d="M3 12l3.5-3.5 2.5 2.5 2-2L14 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg></button><span class="sep"></span>
       <button id="symBtn" class="sym" aria-haspopup="true" aria-expanded="false" title="Symbols, math templates and Detexify (Ctrl+Shift+K)">Σ Symbols ▾</button>
       <button id="fmtPill" class="pill" aria-expanded="false" aria-controls="fmtTools" title="Text formatting: style, font, size, alignment, lists, tables…"><span class="aa">Aa</span> Format</button>
       <span class="grow"></span>

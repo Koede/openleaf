@@ -89,6 +89,10 @@ document.querySelectorAll('#logHead [data-tab]').forEach((b) => (b.onclick = () 
 const compileSoon = debounce(() => compile(), 120);
 bus.on('compile-request', ({ force } = {}) => (force ? compile() : compileSoon()));
 bus.on('saved', ({ paths }) => { if (prefs.autoCompile && paths.some(isCompileInput)) compileSoon(); });
+// Co-edited files are saved by the server as you type: the person typing triggers the compile (after a
+// pause), everyone else gets the result through the shared compile events.
+const coEditCompile = debounce(() => { if (prefs.autoCompile) compileSoon(); }, 900);
+bus.on('edit', ({ path, remote, collab } = {}) => { if (collab && !remote && isCompileInput(path)) coEditCompile(); });
 bus.on('external-change', ({ path }) => { if (prefs.autoCompile && isCompileInput(path)) compileSoon(); });
 bus.on('settings', () => compileSoon());
 

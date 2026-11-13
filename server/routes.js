@@ -30,7 +30,7 @@ module.exports = function routes({ root, hub, timeoutMs, stallMs, maxProjects = 
 
   // Shared projects: a collaborator addresses one as "owner/project". Resolve it to the owner's folder and
   // check the role; viewers may read, compile and search, but not change anything.
-  const VIEWER_OK = /\/(compile|compile\/stop|clean|search|share\/leave|copy)$/;
+  const VIEWER_OK = /\/(compile|compile\/stop|clean|search|share\/leave|copy|chat)$/;
   r.param('p', (req, res, next, p) => {
     if (req.ownRoot === undefined) { req.ownRoot = req.userRoot; req.ownScope = req.scope; }
     req.role = 'owner'; req.shared = false;
@@ -88,6 +88,20 @@ module.exports = function routes({ root, hub, timeoutMs, stallMs, maxProjects = 
     res.json({ ok: true });
   }));
 
+  // ---------- project chat ----------
+  const chatFile = (dir) => path.join(dir, U.CHAT);
+  const readChat = (dir) => { try { return JSON.parse(fs.readFileSync(chatFile(dir), 'utf8')); } catch { return []; } };
+  r.get('/p/:p/chat', wrap((req, res) => { const { dir } = P(req); res.json({ messages: readChat(dir).slice(-300), me: req.user || null }); }));
+  r.post('/p/:p/chat', wrap((req, res) => {
+    const { name, dir } = P(req);
+    const text = String(req.body.text || '').replace(/\r\n?/g, '\n').trim().slice(0, 4000);
+    if (!text) throw httpErr(400, 'Empty message');
+    const all = readChat(dir); const message = { id: require('crypto').randomBytes(5).toString('hex'), user: req.user || null, text, ts: Date.now() };
+    all.push(message); U.atomicWrite(chatFile(dir), JSON.stringify(all.slice(-2000)));
+    hub.broadcast(name, { type: 'chat', message });
+    res.json({ ok: true, message });
+  }));
+
   // ---------- sharing (accounts mode) ----------
   const needShares = () => { if (!shares) throw httpErr(404, 'Sharing needs accounts (ACCOUNTS=1)'); };
   const ownerOf = (req) => req.scope.slice(0, -1);
@@ -106,7 +120,7 @@ module.exports = function routes({ root, hub, timeoutMs, stallMs, maxProjects = 
   // ---------- settings ----------
   r.get('/p/:p/settings', wrap((req, res) => {
     const { dir } = P(req); const s = U.readSettings(dir); const det = U.detectMain(dir);
-    res.json({ main: s.main && fs.existsSync(path.join(dir, s.main)) ? s.main : det.main, engine: s.engine || 'pdflatex', haltOnError: !!s.haltOnError, draft: !!s.draft, candidates: det.candidates });
+    res.json({ main: s.main && fs.existsSync(path.join(dir, s.main)) ? s.main : det.main, engine: s.engine || 'pdflatex', haltOnError: !!s.haltOnError, draft: !!s.draft, trackChanges: !!s.trackChanges, candidates: det.candidates });
   }));
   r.put('/p/:p/settings', wrap((req, res) => {
     const { dir } = P(req); const s = U.readSettings(dir); const b = req.body || {};
@@ -114,7 +128,9 @@ module.exports = function routes({ root, hub, timeoutMs, stallMs, maxProjects = 
     if (b.engine !== undefined) { if (!compiler.ENGINES[b.engine]) throw httpErr(400, 'Unknown engine'); s.engine = b.engine; }
     if (b.haltOnError !== undefined) s.haltOnError = !!b.haltOnError;
     if (b.draft !== undefined) s.draft = !!b.draft;
+    if (b.trackChanges !== undefined) s.trackChanges = !!b.trackChanges;
     fs.writeFileSync(path.join(dir, U.SETTINGS), JSON.stringify(s, null, 2));
+    hub.broadcast(P(req).name, { type: 'settings' });   // e.g. track changes switched on for everyone
     res.json({ ok: true });
   }));
 

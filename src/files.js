@@ -1,5 +1,7 @@
 // Open files / tabs / saving / reacting to changes on disk.
 import * as collab from './collab.js';
+import * as review from './review.js';
+const coExt = (e) => [collab.extension(e), review.extension(e)];
 import { S, bus, prefs, isText, IMG_EXT, flatFiles, fileName, esc, debounce } from './state.js';
 import { api, P, rawUrl, fetchText } from './api.js';
 import { view, mkState, setViewState, gotoPosition, replaceDocExternal, setDiagnosticsForCurrent, setExtraCommands } from './editor.js';
@@ -59,7 +61,7 @@ export async function openFile(path, pos = {}) {
           const e = await collab.open(path);
           if (S.current !== path) return;
           const text = e.ytext.toString();
-          S.collab.add(path); S.cache.set(path, text); S.states.set(path, mkState(text, path, { collab: collab.extension(e) })); opened = true;
+          S.collab.add(path); S.cache.set(path, text); S.states.set(path, mkState(text, path, { collab: coExt(e) })); opened = true;
         } catch { /* fall back to plain editing */ }
       }
       if (!opened) {
@@ -72,7 +74,7 @@ export async function openFile(path, pos = {}) {
       // a stashed editor state does not receive other people's edits: rebuild it from the shared document
       const e = collab.entryFor(path), old = S.states.get(path), text = e.ytext.toString();
       const clamp = (n) => Math.min(n, text.length), sel = old.selection.main;
-      const st = mkState(text, path, { collab: collab.extension(e) });
+      const st = mkState(text, path, { collab: coExt(e) });
       S.states.set(path, st.update({ selection: { anchor: clamp(sel.anchor), head: clamp(sel.head) } }).state); S.cache.set(path, text);
     }
     if (S.current !== path) return;                    // another open() won the race
@@ -226,3 +228,5 @@ bus.on('ws-open', async () => {
     } else S.states.delete(p);
   }
 });
+// Someone changed a project setting (e.g. switched track changes on): reload the settings.
+bus.on('ws-settings', async () => { try { Object.assign(S.settings, await api(`${P()}/settings`)); bus.emit('settings'); } catch {} });
