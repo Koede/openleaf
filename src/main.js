@@ -107,6 +107,11 @@ $('tbMath').onclick = () => { ed.cmdInlineMath(ed.view); ed.view.focus(); };
 $('tbComment').onclick = () => { ed.cmdToggleComment(ed.view); ed.view.focus(); };
 $('tbFind').onclick = ed.doFind;
 $('tbSync').onclick = () => bus.emit('forward-sync');
+// Arrows on the editor/PDF divider (as in Overleaf) and presentation mode
+for (const id of ['syncToPdf', 'syncToCode']) $(id).addEventListener('pointerdown', (e) => e.stopPropagation()); // not a resize
+$('syncToPdf').onclick = () => bus.emit('forward-sync');
+$('syncToCode').onclick = () => pdf.syncToSource();
+$('presentBtn').onclick = () => pdf.present();
 document.querySelectorAll('#editorTools button:not(#symBtn)').forEach((b) => b.addEventListener('mousedown', (e) => e.preventDefault()));
 
 // ---------- PDF toolbar ----------

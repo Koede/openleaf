@@ -81,12 +81,12 @@
     <div id="preview" hidden></div>
   </section>
 
-  <div class="splitter" id="splitR" role="separator" aria-orientation="vertical" aria-label="Resize PDF pane" tabindex="0"></div>
+  <div class="splitter" id="splitR" role="separator" aria-orientation="vertical" aria-label="Resize PDF pane" tabindex="0"><div id="syncArrows"><button id="syncToPdf" title="Go to the PDF location of the cursor (Ctrl+Alt+J)" aria-label="Go to PDF location">→</button><button id="syncToCode" title="Go to the code of what is shown in the PDF" aria-label="Go to code location">←</button></div></div>
 
   <section id="pdfPane">
     <div id="pdfTools">
       <button id="zoomOut" title="Zoom out" aria-label="Zoom out">−</button><span id="zoomLabel" class="zoom">100%</span><button id="zoomIn" title="Zoom in" aria-label="Zoom in">＋</button>
-      <button id="fitW" title="Fit width">↔</button><button id="fitP" title="Fit page">⤢</button>
+      <button id="fitW" title="Fit width">↔</button><button id="fitP" title="Fit page">⤢</button><button id="presentBtn" title="Presentation mode: full screen, one page at a time" aria-label="Presentation mode">▶</button>
       <span class="sep"></span>
       <input id="pageNum" type="number" min="1" value="1" aria-label="Page"> / <span id="pageTotal">0</span>
       <span class="grow"></span>

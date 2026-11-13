@@ -118,12 +118,59 @@ export function showSource(r) {
   el._ok ? apply() : renderPage(el).then(apply);
   return true;
 }
+async function sourceAt(page, x, y) {
+  const q = new URLSearchParams({ pdf: V.name, page, x: x.toFixed(2), y: y.toFixed(2) });
+  try { const s = await api(`${P()}/synctex/edit?${q}`); if (s.found) bus.emit('goto-source', s); else toast('No matching source for that spot', { kind: 'warn' }); } catch (x) { toast(x.message, { kind: 'error' }); }
+}
 $('pdfPages').addEventListener('dblclick', async (e) => {
   const el = e.target.closest('.pdf-page'); if (!el || !S.server.synctex) return;
   const r = el.getBoundingClientRect();
-  const q = new URLSearchParams({ pdf: V.name, page: el.dataset.n, x: ((e.clientX - r.left) / V.scale).toFixed(2), y: ((e.clientY - r.top) / V.scale).toFixed(2) });
-  try { const s = await api(`${P()}/synctex/edit?${q}`); if (s.found) bus.emit('goto-source', s); else toast('No matching source for that spot', { kind: 'warn' }); } catch (x) { toast(x.message, { kind: 'error' }); }
+  sourceAt(el.dataset.n, (e.clientX - r.left) / V.scale, (e.clientY - r.top) / V.scale);
 });
+// "←" between editor and PDF: the source of what is at the top third of the PDF view.
+export function syncToSource() {
+  if (!V.doc || !S.server.synctex) { toast(V.doc ? 'SyncTeX is not available on this server' : 'No PDF yet', { kind: 'warn' }); return; }
+  const sc = scroller(), y = sc.scrollTop + sc.clientHeight / 3, i = pageAt(y);
+  sourceAt(i + 1, (V.size[i].w / 2), Math.max(0, (y - V.top[i]) / V.scale));
+}
+export const visiblePage = () => (V.doc ? pageAt(scroller().scrollTop + scroller().clientHeight / 3) + 1 : 1);
+
+// ---------- presentation mode: one page at a time, full screen ----------
+export async function present() {
+  if (!V.doc) { toast('No PDF yet', { kind: 'warn' }); return; }
+  const total = V.doc.numPages; let n = visiblePage(), token = 0;
+  const ov = document.createElement('div'); ov.id = 'present'; ov.tabIndex = -1; ov.setAttribute('role', 'dialog'); ov.setAttribute('aria-label', 'Presentation');
+  ov.innerHTML = '<canvas></canvas><div class="pr-count" aria-live="polite"></div><div class="pr-help">← → or click to move · Esc to leave</div>';
+  document.body.appendChild(ov);
+  const canvas = ov.querySelector('canvas'), count = ov.querySelector('.pr-count');
+  const draw = async () => {
+    const my = ++token; const page = await V.doc.getPage(n); if (my !== token) return;
+    const base = page.getViewport({ scale: 1 }), W = ov.clientWidth || innerWidth, H = ov.clientHeight || innerHeight;
+    const scale = Math.min(W / base.width, H / base.height), dpr = window.devicePixelRatio || 1;
+    const vp = page.getViewport({ scale: scale * dpr });
+    canvas.width = Math.floor(vp.width); canvas.height = Math.floor(vp.height);
+    canvas.style.width = Math.floor(vp.width / dpr) + 'px'; canvas.style.height = Math.floor(vp.height / dpr) + 'px';
+    await page.render({ canvasContext: canvas.getContext('2d'), viewport: vp }).promise;
+    count.textContent = `${n} / ${total}`; count.classList.remove('fade'); void count.offsetWidth; count.classList.add('fade');
+  };
+  const go = (d) => { const m = Math.min(total, Math.max(1, d === 'first' ? 1 : d === 'last' ? total : n + d)); if (m !== n) { n = m; draw(); } };
+  const leave = () => { document.removeEventListener('keydown', key, true); removeEventListener('resize', onResize); document.removeEventListener('fullscreenchange', onFs); ov.remove(); gotoPage(n); if (document.fullscreenElement) document.exitFullscreen().catch(() => {}); };
+  const key = (e) => {
+    const k = e.key; let used = true;
+    if (['ArrowRight', 'ArrowDown', 'PageDown', ' ', 'Enter', 'n'].includes(k)) go(1);
+    else if (['ArrowLeft', 'ArrowUp', 'PageUp', 'Backspace', 'p'].includes(k)) go(-1);
+    else if (k === 'Home') go('first'); else if (k === 'End') go('last');
+    else if (k === 'Escape' || k === 'q') leave(); else used = false;
+    if (used) { e.preventDefault(); e.stopPropagation(); }
+  };
+  const onResize = debounce(draw, 100);
+  const onFs = () => { if (!document.fullscreenElement && document.body.contains(ov)) leave(); };
+  ov.addEventListener('click', (e) => go(e.clientX < ov.clientWidth / 4 ? -1 : 1));
+  ov.addEventListener('contextmenu', (e) => { e.preventDefault(); go(-1); });
+  document.addEventListener('keydown', key, true); addEventListener('resize', onResize);
+  try { await ov.requestFullscreen(); document.addEventListener('fullscreenchange', onFs); } catch {} // full window if full screen is refused
+  ov.focus(); draw();
+}
 
 // ---------- search ----------
 async function pageStrings(i) {

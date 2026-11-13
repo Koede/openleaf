@@ -190,3 +190,16 @@ button.link{border:0;background:none;color:var(--accent);padding:2px}.auth-note{
 .pk-foot{display:flex;gap:8px;align-items:center;margin-top:10px}.pk-foot .grow{flex:1}.pk-hint{font-size:12px}
 .modal.fig{width:min(560px,95vw)}.modal.fig select,.modal.fig input[type=text]{box-sizing:border-box;width:100%;padding:6px 8px}.modal.fig .pk-row select{flex:1}
 .fig-prev{display:flex;justify-content:center}.fig-prev img{max-width:100%;max-height:160px;border:1px solid var(--border);border-radius:6px;margin:4px 0 8px}
+
+/* Sync arrows on the editor/PDF divider */
+#syncArrows{position:absolute;top:45%;left:50%;transform:translate(-50%,-50%);display:flex;flex-direction:column;gap:4px;z-index:6}
+#syncArrows button{width:22px;height:22px;padding:0;border-radius:11px;font-size:12px;line-height:1;background:var(--bg);box-shadow:var(--shadow);opacity:.85}
+#syncArrows button:hover{opacity:1;background:var(--accent);color:var(--accent-fg);border-color:var(--accent)}
+.splitter:hover #syncArrows,.splitter:focus #syncArrows{opacity:1}
+#work:not([data-layout=split]) #syncArrows{display:none}
+/* Presentation mode */
+#present{position:fixed;inset:0;z-index:200;background:#000;display:flex;align-items:center;justify-content:center;cursor:pointer;outline:none}
+#present canvas{background:#fff;box-shadow:0 0 40px rgba(0,0,0,.6)}
+#present .pr-count{position:absolute;right:16px;bottom:12px;color:#ddd;font-size:13px;background:rgba(0,0,0,.5);padding:2px 8px;border-radius:10px}
+#present .pr-count.fade{animation:prFade 2.5s forwards}@keyframes prFade{0%,70%{opacity:1}100%{opacity:0}}
+#present .pr-help{position:absolute;left:16px;bottom:12px;color:#888;font-size:12px;animation:prFade 4s forwards}
