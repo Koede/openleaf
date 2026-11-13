@@ -1,4 +1,5 @@
 // Open files / tabs / saving / reacting to changes on disk.
+import * as collab from './collab.js';
 import { S, bus, prefs, isText, IMG_EXT, flatFiles, fileName, esc, debounce } from './state.js';
 import { api, P, rawUrl, fetchText } from './api.js';
 import { view, mkState, setViewState, gotoPosition, replaceDocExternal, setDiagnosticsForCurrent, setExtraCommands } from './editor.js';
@@ -51,9 +52,28 @@ export async function openFile(path, pos = {}) {
   if (isText(path)) {
     ed.hidden = false; pv.hidden = true; tools.classList.remove('disabled'); ftools.classList.remove('disabled');
     if (!S.states.has(path)) {
-      let text;
-      try { text = await fetchText(path); } catch (e) { toast(e.message, { kind: 'error' }); S.open = S.open.filter((x) => x !== path); S.current = S.open[0] || null; renderTabs(); return; }
-      S.cache.set(path, text); S.states.set(path, mkState(text, path));
+      // Co-edit live when the server is reachable (the text comes from the shared document); otherwise load and autosave.
+      let opened = false;
+      if (collab.available()) {
+        try {
+          const e = await collab.open(path);
+          if (S.current !== path) return;
+          const text = e.ytext.toString();
+          S.collab.add(path); S.cache.set(path, text); S.states.set(path, mkState(text, path, { collab: collab.extension(e) })); opened = true;
+        } catch { /* fall back to plain editing */ }
+      }
+      if (!opened) {
+        let text;
+        try { text = await fetchText(path); } catch (e) { toast(e.message, { kind: 'error' }); S.open = S.open.filter((x) => x !== path); S.current = S.open[0] || null; renderTabs(); return; }
+        S.cache.set(path, text); S.states.set(path, mkState(text, path));
+      }
+    }
+    else if (S.collab.has(path) && collab.entryFor(path)) {
+      // a stashed editor state does not receive other people's edits: rebuild it from the shared document
+      const e = collab.entryFor(path), old = S.states.get(path), text = e.ytext.toString();
+      const clamp = (n) => Math.min(n, text.length), sel = old.selection.main;
+      const st = mkState(text, path, { collab: collab.extension(e) });
+      S.states.set(path, st.update({ selection: { anchor: clamp(sel.anchor), head: clamp(sel.head) } }).state); S.cache.set(path, text);
     }
     if (S.current !== path) return;                    // another open() won the race
     setViewState(S.states.get(path));
@@ -70,6 +90,7 @@ export function closeTab(path) {
   const i = S.open.indexOf(path); if (i < 0) return;
   if (S.dirty.has(path) && !confirm(`“${fileName(path)}” has unsaved changes that will still be autosaved shortly. Close anyway?`)) return;
   S.open.splice(i, 1); S.states.delete(path);
+  if (S.collab.has(path)) { collab.close(path); S.collab.delete(path); }
   if (S.current === path) {
     S.current = null;
     const next = S.open[Math.min(i, S.open.length - 1)];
@@ -97,7 +118,7 @@ export function saveDirty() {
   return saving;
 }
 const autosave = debounce(() => saveDirty(), 700);
-bus.on('edit', () => { renderTabs(); autosave(); });
+bus.on('edit', () => { renderTabs(); if (S.dirty.size) autosave(); });
 bus.on('save-request', async ({ compile } = {}) => { autosave.cancel(); const d = await saveDirty(); if (compile) bus.emit('compile-request', { force: true }); return d; });
 
 // ---------- disk changes ----------
@@ -106,6 +127,7 @@ export async function reloadFromDisk(path) {
   let text; try { text = await fetchText(path); } catch { return; }
   if (CACHEABLE.test(path)) S.cache.set(path, text);
   if (!isText(path)) return;
+  if (S.collab.has(path)) { S.conflicts.delete(path); showBanner(); bus.emit('cache'); return; }   // the change arrives through the shared document
   if (path === S.current && S.states.has(path)) replaceDocExternal(text);
   else if (S.states.has(path)) S.states.set(path, mkState(text, path));
   S.dirty.delete(path); S.conflicts.delete(path); renderTabs(); showBanner(); bus.emit('cache');
@@ -120,6 +142,7 @@ export async function onFsEvent(m) {
     bus.emit('cache'); return;
   }
   if (m.kind !== 'change') return;
+  if (S.collab.has(p)) { S.cache.set(p, p === S.current ? view.state.doc.toString() : S.states.get(p)?.doc.toString() ?? S.cache.get(p)); bus.emit('cache'); return; }
   if (S.states.has(p) && isText(p)) {
     let disk; try { disk = await fetchText(p); } catch { return; }
     const mine = p === S.current ? view.state.doc.toString() : S.states.get(p).doc.toString();
@@ -165,10 +188,41 @@ export async function editFile(path, transform) {
     const cur = st.doc.toString(); let a = 0; while (a < cur.length && a < next.length && cur[a] === next[a]) a++;
     let b = 0; while (b < cur.length - a && b < next.length - a && cur[cur.length - 1 - b] === next[next.length - 1 - b]) b++;
     const spec = { changes: { from: a, to: cur.length - b, insert: next.slice(a, next.length - b) } };
-    if (path === S.current) view.dispatch(spec); else { S.states.set(path, st.update(spec).state); S.dirty.add(path); S.cache.set(path, next); bus.emit('edit', { path }); }
+    if (path === S.current) view.dispatch(spec);
+    else if (S.collab.has(path)) { collab.setText(path, next); S.cache.set(path, next); bus.emit('edit', { path }); }   // goes to everyone; the server saves it
+    else { S.states.set(path, st.update(spec).state); S.dirty.add(path); S.cache.set(path, next); bus.emit('edit', { path }); }
     return true;
   }
   const cur = await fetchText(path); const next = transform(cur); if (next === null || next === cur) return false;
   await api(`${P()}/file`, { method: 'PUT', json: { path, content: next } }); S.cache.set(path, next); bus.emit('cache'); bus.emit('saved', { paths: [path] });
   return true;
 }
+
+// ---------- co-editing lifecycle ----------
+// The server started a document over (restart): reopen it and put back what was on screen.
+bus.on('collab-reset', async ({ path, text }) => {
+  S.collab.delete(path); S.states.delete(path);
+  if (!S.open.includes(path)) return;
+  if (S.current === path) {
+    await openFile(path, { focus: false });
+    const cur = view.state.doc.toString();
+    if (S.collab.has(path) && cur !== text) collab.setText(path, text);
+  }
+});
+// The file was deleted or renamed on the server: stop co-editing it; reopen if it still exists.
+bus.on('collab-closed', ({ path }) => {
+  S.collab.delete(path); S.states.delete(path);
+  if (S.current === path && flatFiles().includes(path)) openFile(path, { focus: false });
+});
+// The live connection came up (or back): switch open files that have no unsaved changes to co-editing.
+bus.on('ws-open', async () => {
+  if (!collab.available()) return;
+  for (const p of [...S.open]) {
+    if (S.collab.has(p) || S.dirty.has(p) || !isText(p) || !S.states.has(p)) continue;
+    if (p === S.current) {
+      const sel = view.state.selection.main;
+      S.states.delete(p); await openFile(p, { focus: false });
+      const n = view.state.doc.length; view.dispatch({ selection: { anchor: Math.min(sel.anchor, n), head: Math.min(sel.head, n) } });
+    } else S.states.delete(p);
+  }
+});

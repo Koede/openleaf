@@ -54,7 +54,7 @@ export async function applyResult(r) {
   if (r.hasPdf) await pdf.load(`${P()}/output.pdf?v=${r.pdfVersion}`, r.pdfVersion, r.mainPdf);
   if (errs && !$('logBody').classList.contains('open-once')) { $('logBody').classList.add('open-once'); showLog(true); }
   bus.emit('compiled', r);
-  if (r.hasPdf) api(`${P()}/wordcount`).then((w) => ($('statWords').textContent = `${w.words.toLocaleString()} words`)).catch(() => {});
+  if (r.hasPdf) api(`${P()}/wordcount`).then((w) => ($('statWords').textContent = w.noMain ? '' : `${w.words.toLocaleString()} words`)).catch(() => {});
 }
 
 function showLog(open) { const l = $('logBody'); l.classList.toggle('collapsed', !open); $('logToggle').textContent = open ? '▾' : '▴'; $('logToggle').setAttribute('aria-expanded', open); }

@@ -216,3 +216,8 @@ body.ro #newFileBtn,body.ro #newFolderBtn,body.ro #uploadBtn,body.ro .drop-hint,
 .sh-note{font-size:13px;margin:4px 0 8px}
 .sh-link{display:flex;align-items:center;gap:6px;margin:6px 0}.sh-link input[type=text]{flex:1;min-width:0;font-size:12px;padding:5px 7px;box-sizing:border-box}.sh-toggle{white-space:nowrap;min-width:9.5em}
 .modal.share .modal-actions{display:flex;align-items:center}.modal.share .modal-actions .grow{flex:1}
+
+/* Who else is in this file (co-editing) */
+#crumbs .cr-people{order:99;margin-left:auto;display:flex;gap:4px;padding-left:10px}
+#crumbs .cr-person{font-size:11px;font-weight:600;color:#fff;background:var(--c);border-radius:9px;padding:0 7px;line-height:17px}
+.cm-ySelectionInfo{font-family:system-ui,sans-serif;font-size:11px;padding:1px 4px;border-radius:3px 3px 3px 0}

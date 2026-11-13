@@ -14,6 +14,7 @@ import './format.js';
 import { ensureSignedIn, signOut, changePassword } from './auth.js';
 import { initFeedback, openFeedback } from './feedback.js';
 import { saveFile } from './save.js';
+import * as collab from './collab.js';
 import { openShare, joinFromHash } from './share.js';
 import { openRefPicker, openCitePicker, openFigureDialog } from './pickers.js';
 import './crumbs.js';
@@ -192,6 +193,7 @@ $('zipInput').onchange = async (e) => {
 
 export async function openProject(name) {
   if (S.project) { try { await files.saveDirty(); } catch {} }
+  collab.closeAll(); S.collab.clear();
   S.project = name; S.open = []; S.current = null; S.states.clear(); S.dirty.clear(); S.cache.clear(); S.issues = []; S.lastResult = null; S.conflicts.clear();
   // shared projects are "owner/project"; viewers get a read-only editor
   const shared = name.includes('/') ? (S.shared || []).find((x) => x.name === name) : null;

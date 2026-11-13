@@ -4,6 +4,7 @@ import { S, bus, prefs, esc, debounce } from './state.js';
 import { outlineItems } from './panels.js';
 import { openFile } from './files.js';
 import { view } from './editor.js';
+import * as collab from './collab.js';
 
 const $ = (id) => document.getElementById(id);
 let items = [], line = 1;
@@ -30,7 +31,9 @@ function render() {
   if (nav.hidden) return;
   const parts = chain();
   const file = S.current.split('/').pop();
-  nav.innerHTML = `<span class="cr-file" title="${esc(S.current)}">${esc(file)}</span>` + parts.map((it, i) =>
+  const people = collab.peopleIn(S.current);
+  const who = people.length ? `<span class="cr-people" title="Also in this file">${people.map((u) => `<span class="cr-person" style="--c:${esc(u.color || '#888')}">${esc(u.name)}</span>`).join('')}</span>` : '';
+  nav.innerHTML = who + `<span class="cr-file" title="${esc(S.current)}">${esc(file)}</span>` + parts.map((it, i) =>
     `<span class="cr-sep" aria-hidden="true">›</span><button type="button" class="cr${i === parts.length - 1 ? ' last' : ''}" data-i="${items.indexOf(it)}" title="${esc(it.label)} (${esc(it.file)}:${it.line})">${esc(it.label || '(untitled)')}</button>`).join('');
 }
 
@@ -41,4 +44,5 @@ $('crumbs')?.addEventListener('click', (e) => {
 bus.on('cursor', ({ line: l }) => { line = l; render(); });
 bus.on('cache', refreshSoon); bus.on('edit', refreshSoon); bus.on('settings', refreshSoon); bus.on('current', () => { try { line = view.state.doc.lineAt(view.state.selection.main.head).number; } catch { line = 1; } render(); });
 bus.on('prefs', render);
+bus.on('collab-people', ({ path }) => { if (path === S.current) render(); });
 refreshSoon();

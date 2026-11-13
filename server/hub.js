@@ -29,15 +29,18 @@ class Hub {
     this.clients.add(c);
     ws.on('message', (data) => {
       let m; try { m = JSON.parse(data.toString()); } catch { return; }
-      const key = m.type === 'watch' && typeof m.project === 'string' ? this.resolve(ok, m.project) : null;
+      if (typeof m.type === 'string' && m.type.startsWith('y-')) { if (this.collab) this.collab.onMessage(c, m); return; }
+      const res = m.type === 'watch' && typeof m.project === 'string' ? this.resolve(ok, m.project) : null;
+      const key = res && (typeof res === 'string' ? res : res.key);
       if (key) {
         const prev = c.project;
-        c.project = key; c.name = m.project; c.id = String(m.clientId || '').slice(0, 40);
+        c.project = key; c.name = m.project; c.role = (res && res.role) || 'owner'; c.id = String(m.clientId || '').slice(0, 40);
+        if (this.collab && prev && prev !== key) this.collab.switched(c);
         this.ensureWatcher(c.project);
         if (prev && prev !== c.project) this.gc(prev);
       }
     });
-    ws.on('close', () => { this.clients.delete(c); if (c.project) this.gc(c.project); });
+    ws.on('close', () => { this.clients.delete(c); if (this.collab) this.collab.closed(c); if (c.project) this.gc(c.project); });
     ws.on('error', () => {});
     ws.send(JSON.stringify({ type: 'hello' }));
   }
@@ -49,8 +52,15 @@ class Hub {
     }
   }
 
-  noteWrite(project, rel, buf) { const w = this.watchers.get(project); if (w) w.known.set(rel, sha(buf)); }
-  noteRemove(project, rel) { const w = this.watchers.get(project); if (w) for (const k of [...w.known.keys()]) if (k === rel || k.startsWith(rel + '/')) w.known.delete(k); }
+  // Every write the server makes goes through here; the collaboration layer merges writes that did not come from it.
+  noteWrite(project, rel, buf, opts = {}) {
+    const w = this.watchers.get(project); if (w) w.known.set(rel, sha(buf));
+    if (this.collab && !opts.fromCollab) this.collab.diskChanged(project, rel, buf);
+  }
+  noteRemove(project, rel) {
+    const w = this.watchers.get(project); if (w) for (const k of [...w.known.keys()]) if (k === rel || k.startsWith(rel + '/')) w.known.delete(k);
+    if (this.collab) this.collab.removed(project, rel);
+  }
 
   ensureWatcher(project) {
     if (this.watchers.has(project)) return;
@@ -74,14 +84,17 @@ class Hub {
     const abs = path.join(this.root, project, rel);
     let stat = null; try { stat = fs.statSync(abs); } catch {}
     if (stat && stat.isFile()) {
-      let h; try { h = sha(fs.readFileSync(abs)); } catch { return; }
+      let buf; try { buf = fs.readFileSync(abs); } catch { return; }
+      const h = sha(buf);
       if (st.known.get(rel) === h) return;       // our own write
       st.known.set(rel, h);
+      if (this.collab) this.collab.diskChanged(project, rel, buf);   // changed outside the app: merge into live documents
       this.broadcast(project, { type: 'fs', path: rel, kind: 'change' });
     } else if (stat && stat.isDirectory()) {
       this.broadcast(project, { type: 'fs', path: rel, kind: 'dir' });
     } else {
       st.known.delete(rel);
+      if (this.collab) this.collab.removed(project, rel);
       this.broadcast(project, { type: 'fs', path: rel, kind: 'remove' });
     }
   }

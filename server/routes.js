@@ -23,7 +23,9 @@ module.exports = function routes({ root, hub, timeoutMs, stallMs, maxProjects = 
   const countProjects = (dir) => fs.readdirSync(dir, { withFileTypes: true }).filter((e) => e.isDirectory() && U.NAME_RE.test(e.name)).length;
   const checkQuota = (req) => { if (countProjects(ownRoot(req)) >= maxProjects) throw httpErr(403, `Project limit reached (${maxProjects}). Delete a project first.`); };
   const pdirOf = (req) => { const d = U.projectDir(rootOf(req), pname(req)); if (!fs.existsSync(d)) throw httpErr(404, 'Project not found'); return d; };
-  const P = (req) => ({ name: keyOf(req, pname(req)), label: pname(req), dir: pdirOf(req) });
+  // Every request that touches a project first writes out pending collaborative edits, so compiling,
+  // downloading, searching and word counts always see what is on screen.
+  const P = (req) => { const name = keyOf(req, pname(req)); const dir = pdirOf(req); if (hub.collab) hub.collab.flush(name); return { name, label: pname(req), dir }; };
   const ownerOnly = (req, what) => { if (req.role && req.role !== 'owner') throw httpErr(403, `Only the project's owner can ${what}`); };
 
   // Shared projects: a collaborator addresses one as "owner/project". Resolve it to the owner's folder and
@@ -232,7 +234,7 @@ module.exports = function routes({ root, hub, timeoutMs, stallMs, maxProjects = 
   r.get('/p/:p/wordcount', wrap((req, res) => {
     const { dir } = P(req); const s = U.readSettings(dir);
     const main = req.query.main ? U.resolveIn(dir, req.query.main).rel : s.main || U.detectMain(dir).main;
-    if (!main) throw httpErr(400, 'No main file');
+    if (!main || !fs.existsSync(path.join(dir, main))) return res.json({ words: 0, noMain: true });   // nothing to count yet
     res.json(wordCount(dir, main));
   }));
 

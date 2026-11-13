@@ -9,6 +9,7 @@ import { autocompletion, closeBrackets, closeBracketsKeymap, completionKeymap, s
 import { lintGutter, setDiagnostics } from '@codemirror/lint';
 import { oneDark } from '@codemirror/theme-one-dark';
 import { S, bus, prefs, flatFiles, IMG_EXT } from './state.js';
+import * as collab from './collab.js';
 
 export const External = Annotation.define();       // transactions that come from disk, not from typing
 
@@ -172,7 +173,7 @@ const baseTheme = EditorView.theme({
 const emit = EditorView.updateListener.of((u) => {
   if (u.docChanged && !u.transactions.some((tr) => tr.annotation(External))) {
     const p = S.current;
-    if (p) { S.dirty.add(p); S.cache.set(p, u.state.doc.toString()); bus.emit('edit', { path: p }); }
+    if (p) { if (!S.collab.has(p)) S.dirty.add(p); S.cache.set(p, u.state.doc.toString()); bus.emit('edit', { path: p }); }
   }
   if (u.selectionSet || u.docChanged) {
     const h = u.state.selection.main; const l = u.state.doc.lineAt(h.head);
@@ -192,11 +193,12 @@ const keys = [
   { key: 'Escape', run: (v) => { clearSnippet(v); return false; } },
 ];
 
-export function mkState(doc, path) {
+// opts.collab: the Yjs binding (co-editing); it brings its own undo history
+export function mkState(doc, path, opts = {}) {
   return EditorState.create({
     doc,
     extensions: [
-      lineNumbers(), highlightActiveLineGutter(), highlightActiveLine(), drawSelection(), dropCursor(), history(), bracketMatching(),
+      lineNumbers(), highlightActiveLineGutter(), highlightActiveLine(), drawSelection(), dropCursor(), opts.collab ? [] : history(), bracketMatching(),
       closeBrackets(), highlightSelectionMatches(), search({ top: true }), texFold, lintGutter(), indentUnit.of('  '),
       EditorState.languageData.of(() => [{ closeBrackets: { brackets: ['(', '[', '{', '$'] } }]),
       langFor(path), baseTheme,
@@ -204,14 +206,15 @@ export function mkState(doc, path) {
       autocompletion({ override: [latexComplete], icons: false }),
       Prec.high(autoEnd),
       emit,
-      keymap.of([...keys, ...closeBracketsKeymap, ...defaultKeymap, ...searchKeymap, ...historyKeymap, ...foldKeymap, ...completionKeymap, indentWithTab]),
+      opts.collab || [],
+      keymap.of([...keys, ...closeBracketsKeymap, ...defaultKeymap, ...searchKeymap, ...(opts.collab ? [] : historyKeymap), ...foldKeymap, ...completionKeymap, indentWithTab]),
     ],
   });
 }
 
 export const view = new EditorView({ parent: document.getElementById('editorHost'), state: mkState('', 'x.tex') });
-export const doUndo = () => { undo(view); view.focus(); };
-export const doRedo = () => { redo(view); view.focus(); };
+export const doUndo = () => { if (!(S.collab.has(S.current) && collab.undo(S.current))) undo(view); view.focus(); };
+export const doRedo = () => { if (!(S.collab.has(S.current) && collab.redo(S.current))) redo(view); view.focus(); };
 export const doFind = () => { openSearchPanel(view); };
 
 // Re-apply preferences that live in compartments (theme, wrapping, spellcheck, folding, font size)

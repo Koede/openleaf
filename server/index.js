@@ -8,6 +8,7 @@ const { Hub } = require('./hub');
 const makeRoutes = require('./routes');
 const { feedbackRouter } = require('./feedback');
 const { Shares } = require('./shares');
+const { Collab } = require('./collab');
 const { NAME_RE } = require('./util');
 const compiler = require('./compile');
 const { Accounts } = require('./accounts');
@@ -46,12 +47,14 @@ function start(opts = {}) {
     if (!authed(req)) return false;
     return accounts ? accounts.verifyWs(req) : true;
   }, (ok, name) => {
-    if (NAME_RE.test(name)) return ((ok && ok.scope) || '') + name;
+    if (NAME_RE.test(name)) return { key: ((ok && ok.scope) || '') + name, role: 'owner' };
     // "owner/project" shared with this account
     const i = name.indexOf('/'); if (!shares || !ok || !ok.user || i < 0) return null;
     const owner = name.slice(0, i), project = name.slice(i + 1);
-    return NAME_RE.test(project) && accounts.users[owner] && shares.roleOf(ok.user, owner, project) ? `${owner}/${project}` : null;
+    const role = NAME_RE.test(project) && accounts.users[owner] ? shares.roleOf(ok.user, owner, project) : null;
+    return role ? { key: `${owner}/${project}`, role } : null;
   });
+  hub.collab = new Collab(ROOT, hub);   // real-time co-editing over the same websocket
 
   const app = express();
   app.disable('x-powered-by');
@@ -102,7 +105,7 @@ function start(opts = {}) {
       console.log(`LaTeX Studio running at http://${HOST === '::1' ? '[::1]' : HOST}:${port}   (projects in ${ROOT})`);
       console.log(`latexmk: ${compiler.HAVE.latexmk ? 'found' : 'MISSING — install TeX Live/MacTeX'} · synctex: ${compiler.HAVE.synctex ? 'found' : 'not found (PDF↔source jumping disabled)'}${TOKEN ? ' · auth token required' : ''}${accounts ? ` · accounts on (signup ${accounts.allowSignup ? 'open' : 'closed'})` : ''}`);
     }
-    resolve({ server, hub, port, root: ROOT, close: () => new Promise((r) => { hub.wss.close(); for (const c of hub.clients) c.ws.terminate(); [...hub.watchers.keys()].forEach((p) => hub.gc(p, true)); server.close(() => r()); }) });
+    resolve({ server, hub, port, root: ROOT, close: () => new Promise((r) => { hub.collab.shutdown(); hub.wss.close(); for (const c of hub.clients) c.ws.terminate(); [...hub.watchers.keys()].forEach((p) => hub.gc(p, true)); server.close(() => r()); }) });
   }));
 }
 

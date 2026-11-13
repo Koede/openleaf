@@ -8,6 +8,7 @@ export const savePrefs = () => { try { localStorage.setItem('ls-prefs', JSON.str
 export const S = {
   project: null, tree: [], candidates: [],
   settings: { main: null, engine: 'pdflatex', haltOnError: false },
+  collab: new Set(),   // open files that are co-edited live (saved by the server, never "unsaved")
   open: [], current: null,
   states: new Map(),            // path -> EditorState (undo history lives here)
   dirty: new Set(),
