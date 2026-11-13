@@ -203,3 +203,16 @@ button.link{border:0;background:none;color:var(--accent);padding:2px}.auth-note{
 #present .pr-count{position:absolute;right:16px;bottom:12px;color:#ddd;font-size:13px;background:rgba(0,0,0,.5);padding:2px 8px;border-radius:10px}
 #present .pr-count.fade{animation:prFade 2.5s forwards}@keyframes prFade{0%,70%{opacity:1}100%{opacity:0}}
 #present .pr-help{position:absolute;left:16px;bottom:12px;color:#888;font-size:12px;animation:prFade 4s forwards}
+
+/* Sharing */
+.share-btn{font-weight:600}
+.proj-badge{margin-left:6px;font-size:11px;font-weight:600;padding:1px 7px;border-radius:9px;background:var(--accent-soft);color:var(--accent);white-space:nowrap}
+body.ro #newFileBtn,body.ro #newFolderBtn,body.ro #uploadBtn,body.ro .drop-hint,body.ro #fmtPill,body.ro #editorTools .ico,body.ro #tbBold,body.ro #tbItalic,body.ro #tbMath,body.ro #tbComment{display:none}
+.modal.share{width:min(620px,95vw)}.modal.share h4{margin:16px 0 4px}
+.sh-invite{display:flex;gap:8px}.sh-invite input{flex:1;box-sizing:border-box;padding:6px 8px}
+.sh-list{margin-top:12px;border:1px solid var(--border);border-radius:8px}
+.sh-row{display:flex;align-items:center;gap:8px;padding:7px 10px;border-bottom:1px solid var(--border)}.sh-row:last-child{border-bottom:0}
+.sh-user{flex:1;font-weight:600}.sh-role{color:var(--muted);font-size:13px}.sh-rm{border:0;background:none;color:var(--muted)}.sh-rm:hover{color:var(--err)}
+.sh-note{font-size:13px;margin:4px 0 8px}
+.sh-link{display:flex;align-items:center;gap:6px;margin:6px 0}.sh-link input[type=text]{flex:1;min-width:0;font-size:12px;padding:5px 7px;box-sizing:border-box}.sh-toggle{white-space:nowrap;min-width:9.5em}
+.modal.share .modal-actions{display:flex;align-items:center}.modal.share .modal-actions .grow{flex:1}

@@ -7,6 +7,8 @@ const crypto = require('crypto');
 const { Hub } = require('./hub');
 const makeRoutes = require('./routes');
 const { feedbackRouter } = require('./feedback');
+const { Shares } = require('./shares');
+const { NAME_RE } = require('./util');
 const compiler = require('./compile');
 const { Accounts } = require('./accounts');
 
@@ -37,11 +39,18 @@ function start(opts = {}) {
   const authed = (req) => !TOKEN || cookieOf(req) === cookieVal;
 
   // WebSocket handshakes get the same Host/Origin/auth checks as HTTP requests
+  const shares = accounts ? new Shares(ROOT) : null;
   const hub = new Hub(ROOT, (req) => {
     if (!hostOk(req.headers.host)) return false;
     if (req.headers.origin) { try { if (new URL(req.headers.origin).host !== req.headers.host) return false; } catch { return false; } }
     if (!authed(req)) return false;
     return accounts ? accounts.verifyWs(req) : true;
+  }, (ok, name) => {
+    if (NAME_RE.test(name)) return ((ok && ok.scope) || '') + name;
+    // "owner/project" shared with this account
+    const i = name.indexOf('/'); if (!shares || !ok || !ok.user || i < 0) return null;
+    const owner = name.slice(0, i), project = name.slice(i + 1);
+    return NAME_RE.test(project) && accounts.users[owner] && shares.roleOf(ok.user, owner, project) ? `${owner}/${project}` : null;
   });
 
   const app = express();
@@ -74,7 +83,7 @@ function start(opts = {}) {
   if (accounts) accounts.mount(app);
   const texVersion = (() => { try { return (require('child_process').spawnSync('pdftex', ['--version'], { encoding: 'utf8' }).stdout || '').split('\n')[0].replace(/^This is /, '').trim() || null; } catch { return null; } })();
   app.use('/api', feedbackRouter({ root: ROOT, accounts, info: { version: require('../package.json').version, tex: texVersion } }));
-  app.use('/api', makeRoutes({ root: ROOT, hub, timeoutMs: TIMEOUT, stallMs: STALL, maxProjects: MAX_PROJECTS }));
+  app.use('/api', makeRoutes({ root: ROOT, hub, timeoutMs: TIMEOUT, stallMs: STALL, maxProjects: MAX_PROJECTS, accounts, shares }));
   if (!accounts) app.get('/api/auth/me', (req, res) => res.json({ accounts: false, user: null }));
   app.use(express.static(path.join(__dirname, '..', 'public'), { etag: true, maxAge: 0 }));
   app.use('/api', (req, res) => res.status(404).json({ error: 'Not found' }));

@@ -7,8 +7,9 @@ const { WebSocketServer } = require('ws');
 const { HIDDEN, sha, NAME_RE } = require('./util');
 
 class Hub {
-  constructor(root, verify) {
-    this.root = root; this.verify = verify;
+  // resolve(ok, name): hub key for project `name` as asked by a connection (ok = what verify returned), or null
+  constructor(root, verify, resolve = (ok, name) => (NAME_RE.test(name) ? ((ok && ok.scope) || '') + name : null)) {
+    this.root = root; this.verify = verify; this.resolve = resolve;
     this.wss = new WebSocketServer({ noServer: true });
     this.clients = new Set();      // { ws, project, id }
     this.watchers = new Map();     // project -> { w, known:Map, pending:Map }
@@ -18,18 +19,20 @@ class Hub {
     server.on('upgrade', (req, socket, head) => {
       const ok = req.url.startsWith('/ws') && this.verify(req);
       if (!ok) { socket.destroy(); return; }
-      this.wss.handleUpgrade(req, socket, head, (ws) => this.onConnection(ws, ok && ok.scope ? ok.scope : ''));
+      this.wss.handleUpgrade(req, socket, head, (ws) => this.onConnection(ws, ok));
     });
   }
 
-  onConnection(ws, scope = '') {
-    const c = { ws, project: null, id: null, scope };      // scope = "<user>/" in account mode, so users never share watchers
+  onConnection(ws, ok = true) {
+    // project = hub key ("<owner>/<name>" in account mode), name = what this client calls it
+    const c = { ws, project: null, name: null, id: null, ok };
     this.clients.add(c);
     ws.on('message', (data) => {
       let m; try { m = JSON.parse(data.toString()); } catch { return; }
-      if (m.type === 'watch' && NAME_RE.test(m.project || '')) {
+      const key = m.type === 'watch' && typeof m.project === 'string' ? this.resolve(ok, m.project) : null;
+      if (key) {
         const prev = c.project;
-        c.project = scope + m.project; c.id = String(m.clientId || '').slice(0, 40);
+        c.project = key; c.name = m.project; c.id = String(m.clientId || '').slice(0, 40);
         this.ensureWatcher(c.project);
         if (prev && prev !== c.project) this.gc(prev);
       }
@@ -42,7 +45,7 @@ class Hub {
   broadcast(project, msg, exceptId) {
     for (const c of this.clients) {
       if (c.project !== project || c.ws.readyState !== 1 || (exceptId && c.id === exceptId)) continue;
-      c.ws.send(JSON.stringify({ project: project.slice(c.scope.length), ...msg }));      // clients only ever see plain project names
+      c.ws.send(JSON.stringify({ project: c.name, ...msg }));      // each client sees the project under the name it uses
     }
   }
 

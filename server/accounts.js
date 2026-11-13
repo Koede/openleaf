@@ -117,7 +117,7 @@ class Accounts {
     });
   }
   // WebSocket handshake: returns { scope } or false
-  verifyWs(req) { const u = this.userOf(req); return u ? { scope: u + '/' } : false; }
+  verifyWs(req) { const u = this.userOf(req); return u ? { scope: u + '/', user: u } : false; }
 }
 
 module.exports = { Accounts, USER_RE };

@@ -148,7 +148,9 @@ const autoEnd = EditorView.inputHandler.of((v, from, to, text) => {
 });
 
 // ---------- compartments / state factory ----------
-const comp = { theme: new Compartment(), wrap: new Compartment(), spell: new Compartment(), fold: new Compartment() };
+const comp = { theme: new Compartment(), wrap: new Compartment(), spell: new Compartment(), fold: new Compartment(), ro: new Compartment() };
+// Viewers of a shared project get a read-only editor
+const roExt = () => (S.role === 'view' ? [EditorState.readOnly.of(true), EditorView.editable.of(false)] : []);
 export const isDark = () => document.documentElement.dataset.theme === 'dark';
 const themeExt = () => (isDark() ? oneDark : syntaxHighlighting(defaultHighlightStyle, { fallback: true }));
 const wrapExt = () => (prefs.wrap ? EditorView.lineWrapping : []);
@@ -198,7 +200,7 @@ export function mkState(doc, path) {
       closeBrackets(), highlightSelectionMatches(), search({ top: true }), texFold, lintGutter(), indentUnit.of('  '),
       EditorState.languageData.of(() => [{ closeBrackets: { brackets: ['(', '[', '{', '$'] } }]),
       langFor(path), baseTheme,
-      comp.theme.of(themeExt()), comp.wrap.of(wrapExt()), comp.spell.of(spellExt()), comp.fold.of(foldExt()),
+      comp.theme.of(themeExt()), comp.wrap.of(wrapExt()), comp.spell.of(spellExt()), comp.fold.of(foldExt()), comp.ro.of(roExt()),
       autocompletion({ override: [latexComplete], icons: false }),
       Prec.high(autoEnd),
       emit,
@@ -215,7 +217,7 @@ export const doFind = () => { openSearchPanel(view); };
 // Re-apply preferences that live in compartments (theme, wrapping, spellcheck, folding, font size)
 export function applyPrefs() {
   document.getElementById('editorHost').style.setProperty('--cm-font', prefs.fontSize + 'px');
-  view.dispatch({ effects: [comp.theme.reconfigure(themeExt()), comp.wrap.reconfigure(wrapExt()), comp.spell.reconfigure(spellExt()), comp.fold.reconfigure(foldExt())] });
+  view.dispatch({ effects: [comp.theme.reconfigure(themeExt()), comp.wrap.reconfigure(wrapExt()), comp.spell.reconfigure(spellExt()), comp.fold.reconfigure(foldExt()), comp.ro.reconfigure(roExt())] });
 }
 export function setViewState(state) { view.setState(state); applyPrefs(); setDiagnosticsForCurrent(); }
 

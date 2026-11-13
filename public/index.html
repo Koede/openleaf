@@ -10,7 +10,7 @@
 </head>
 <body>
 <header id="topbar">
-  <button id="projBtn" class="proj" aria-haspopup="true" aria-expanded="false" title="Switch project"><span class="logo">Te</span><span id="projName">Project</span><span class="caret">▾</span></button>
+  <button id="projBtn" class="proj" aria-haspopup="true" aria-expanded="false" title="Switch project"><span class="logo">Te</span><span id="projName">Project</span><span id="projBadge" class="proj-badge" hidden></span><span class="caret">▾</span></button>
   <div class="sep"></div>
   <label class="sel" title="Main file to compile"><span>Main</span><select id="mainSel" aria-label="Main file"></select></label>
   <label class="sel" title="TeX engine"><span>Engine</span><select id="engineSel" aria-label="Engine"><option value="pdflatex">pdfLaTeX</option><option value="xelatex">XeLaTeX</option><option value="lualatex">LuaLaTeX</option></select></label>
@@ -24,6 +24,7 @@
     <button id="layPdf" title="PDF only" aria-label="PDF only">▥</button>
   </div>
   <button id="dlBtn" aria-haspopup="true" aria-expanded="false" title="Download">⬇ Download ▾</button>
+  <button id="shareBtn" class="share-btn" hidden title="Share this project with other accounts">Share</button>
   <button id="fbBtn" class="fb-btn" title="Report a bug or request a feature" aria-label="Feedback: report a bug or request a feature">Feedback</button>
   <button id="settingsBtn" title="Settings" aria-label="Settings">⚙</button>
   <button id="helpBtn" title="Keyboard shortcuts" aria-label="Keyboard shortcuts">?</button>

@@ -14,6 +14,7 @@ import './format.js';
 import { ensureSignedIn, signOut, changePassword } from './auth.js';
 import { initFeedback, openFeedback } from './feedback.js';
 import { saveFile } from './save.js';
+import { openShare, joinFromHash } from './share.js';
 import { openRefPicker, openCitePicker, openFigureDialog } from './pickers.js';
 import './crumbs.js';
 
@@ -129,7 +130,8 @@ bus.on('saved', () => { $('statSave').textContent = 'saved'; setTimeout(() => !S
 
 // ---------- projects ----------
 let projDD, dlDD;
-async function listProjects() { const r = await api('/api/projects'); S.server = { synctex: r.synctex, latexmk: r.latexmk, templates: r.templates }; return r; }
+async function listProjects() { const r = await api('/api/projects'); S.server = { synctex: r.synctex, latexmk: r.latexmk, templates: r.templates }; S.shared = r.shared || []; return r; }
+const ROLE_TXT = { edit: 'can edit', view: 'can view' };
 
 async function buildProjMenu() {
   const m = $('projMenu'); const r = await listProjects();
@@ -138,11 +140,20 @@ async function buildProjMenu() {
     const b = document.createElement('button'); b.className = 'menu-item' + (p.name === S.project ? ' cur' : '');
     b.innerHTML = `<span>${esc(p.name)}</span><small>${timeAgo(p.mtime)}</small>`; b.onclick = () => { projDD.close(); if (p.name !== S.project) openProject(p.name); }; m.appendChild(b);
   }
+  if (S.shared.length) {
+    m.insertAdjacentHTML('beforeend', '<div class="menu-h">Shared with you</div>');
+    for (const x of S.shared) {
+      const b = document.createElement('button'); b.className = 'menu-item' + (x.name === S.project ? ' cur' : '');
+      b.innerHTML = `<span>${esc(x.project)}</span><small>${esc(x.owner)} · ${ROLE_TXT[x.role]}</small>`; b.onclick = () => { projDD.close(); if (x.name !== S.project) openProject(x.name); }; m.appendChild(b);
+    }
+  }
   m.insertAdjacentHTML('beforeend', '<hr>');
   const add = (label, fn, cls = '') => { const b = document.createElement('button'); b.className = 'menu-item ' + cls; b.textContent = label; b.onclick = () => { projDD.close(); fn(); }; m.appendChild(b); };
   add('＋ New project…', newProject); add('⬆ Import .zip…', () => $('zipInput').click());
   m.insertAdjacentHTML('beforeend', '<hr>');
-  add('Rename current…', renameProject); add('Duplicate current…', copyProject); add('Delete current…', deleteProject, 'danger');
+  if (S.role === 'owner') { add('Rename current…', renameProject); add('Duplicate current…', copyProject); add('Delete current…', deleteProject, 'danger'); }
+  else { add('Make a copy for me…', copyProject); add('Leave this shared project…', () => openShare({ onLeave: leftProject })); }
+  if (S.accounts) add('Share…', () => openShare({ onLeave: leftProject }));
   if (S.user) { m.insertAdjacentHTML('beforeend', '<hr>'); add('Change password…', changePassword); add(`Sign out (${S.user})`, signOut); }
 }
 projDD = dropdown($('projBtn'), $('projMenu'), { onOpen: buildProjMenu });
@@ -157,8 +168,10 @@ async function renameProject() {
   const to = await promptText('Rename project', 'New name', S.project); if (!to || to === S.project) return;
   try { await api(`/api/projects/${encodeURIComponent(S.project)}/rename`, { json: { to } }); await openProject(to); } catch (e) { toast(e.message, { kind: 'error' }); }
 }
+const shortName = (n) => (n.includes('/') ? n.slice(n.indexOf('/') + 1) : n);
+async function leftProject() { const r = await listProjects(); toast('You left the project', { kind: 'ok' }); await openProject(r.projects[0] || (await (async () => { await api('/api/projects', { json: { name: 'untitled', template: 'article' } }); return 'untitled'; })())); }
 async function copyProject() {
-  const to = await promptText('Duplicate project', 'Name for the copy', S.project + '-copy'); if (!to) return;
+  const to = await promptText('Duplicate project', 'Name for the copy', shortName(S.project) + '-copy'); if (!to) return;
   try { await files.saveDirty(); await api(`/api/projects/${encodeURIComponent(S.project)}/copy`, { json: { to } }); await openProject(to); } catch (e) { toast(e.message, { kind: 'error' }); }
 }
 async function deleteProject() {
@@ -180,9 +193,16 @@ $('zipInput').onchange = async (e) => {
 export async function openProject(name) {
   if (S.project) { try { await files.saveDirty(); } catch {} }
   S.project = name; S.open = []; S.current = null; S.states.clear(); S.dirty.clear(); S.cache.clear(); S.issues = []; S.lastResult = null; S.conflicts.clear();
+  // shared projects are "owner/project"; viewers get a read-only editor
+  const shared = name.includes('/') ? (S.shared || []).find((x) => x.name === name) : null;
+  S.role = name.includes('/') ? (shared ? shared.role : 'view') : 'owner';
+  document.body.classList.toggle('ro', S.role === 'view');
   try { localStorage.setItem('ls-last', name); } catch {}
   try { history.replaceState(null, '', '#' + encodeURIComponent(name)); } catch {}
-  $('projName').textContent = name; document.title = name + ' — LaTeX Studio';
+  $('projName').textContent = shortName(name); document.title = shortName(name) + ' — LaTeX Studio';
+  const badge = $('projBadge'); badge.hidden = !shared;
+  if (shared) { badge.textContent = `${shared.owner} · ${S.role === 'view' ? 'view only' : 'shared'}`; badge.title = `Shared with you by ${shared.owner} (${ROLE_TXT[S.role]})`; }
+  $('shareBtn').hidden = !S.accounts;
   ed.setViewState(ed.mkState('', 'x.tex')); files.renderTabs();
   $('issues').innerHTML = ''; $('issueCount').textContent = ''; $('rawLog').textContent = ''; $('statWords').textContent = '';
   $('pdfEmpty').classList.remove('hidden'); $('pdfPages').innerHTML = ''; $('pageTotal').textContent = '0';
@@ -281,11 +301,17 @@ async function boot() {
   if (S.user) { $('projBtn').title = `Signed in as ${S.user}`; }
   let r; try { r = await listProjects(); } catch (e) { toast(e.message, { kind: 'error', ms: 10000 }); return; }
   if (!r.latexmk) toast('latexmk not found — install TeX Live to compile.', { kind: 'warn', ms: 10000 });
-  let name = decodeURIComponent(location.hash.slice(1)); try { name = name || localStorage.getItem('ls-last') || ''; } catch {}
-  if (!r.projects.includes(name)) name = r.projects[0];
+  const joined = S.accounts ? await joinFromHash() : null;   // opened a share link
+  if (joined) r = await listProjects();
+  let name = joined || decodeURIComponent(location.hash.slice(1)); try { name = name || localStorage.getItem('ls-last') || ''; } catch {}
+  if (!r.projects.includes(name) && !(S.shared || []).some((x) => x.name === name)) name = r.projects[0];
   if (!name) { await api('/api/projects', { json: { name: 'my-first-project', template: 'article' } }); name = 'my-first-project'; }
   await openProject(name);
 }
-window.addEventListener('hashchange', () => { const n = decodeURIComponent(location.hash.slice(1)); if (n && n !== S.project) openProject(n).catch(() => {}); });
+window.addEventListener('hashchange', async () => {
+  if (location.hash.startsWith('#join=')) { const n = await joinFromHash(); if (n) { await listProjects(); openProject(n).catch(() => {}); } return; }
+  const n = decodeURIComponent(location.hash.slice(1)); if (n && n !== S.project) openProject(n).catch(() => {});
+});
+$('shareBtn').onclick = () => openShare({ onLeave: leftProject });
 boot();
 window.__studio = { S, bus, prefs, ed, files, pdf };   // handy for debugging and e2e tests

@@ -4,6 +4,7 @@ const AdmZip = require('adm-zip');
 const fs = require('fs');
 const path = require('path');
 const U = require('./util');
+const { USER_RE } = require('./accounts');
 const { httpErr } = U;
 const templates = require('./templates');
 const history = require('./history');
@@ -11,23 +12,44 @@ const compiler = require('./compile');
 const search = require('./search');
 const { wordCount } = require('./wordcount');
 
-module.exports = function routes({ root, hub, timeoutMs, stallMs, maxProjects = 200 }) {
+module.exports = function routes({ root, hub, timeoutMs, stallMs, maxProjects = 200, accounts = null, shares = null }) {
   const r = express.Router();
   const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 100 * 1024 * 1024 } });
   const wrap = (fn) => (req, res, next) => Promise.resolve().then(() => fn(req, res)).catch(next);
   const rootOf = (req) => req.userRoot || root;
+  const ownRoot = (req) => req.ownRoot || rootOf(req);     // the signed-in user's own folder, also while in a shared project
   const keyOf = (req, n) => (req.scope || '') + n;      // hub/compiler key; prefixed by the account in multi-user mode
-  const countProjects = (req) => fs.readdirSync(rootOf(req), { withFileTypes: true }).filter((e) => e.isDirectory() && U.NAME_RE.test(e.name)).length;
-  const checkQuota = (req) => { if (countProjects(req) >= maxProjects) throw httpErr(403, `Project limit reached (${maxProjects}). Delete a project first.`); };
-  const pdirOf = (req) => { const d = U.projectDir(rootOf(req), req.params.p); if (!fs.existsSync(d)) throw httpErr(404, 'Project not found'); return d; };
-  const P = (req) => ({ name: keyOf(req, req.params.p), label: req.params.p, dir: pdirOf(req) });
+  const pname = (req) => req.projectName || req.params.p;  // "thesis" for "alice/thesis" opened by a collaborator
+  const countProjects = (dir) => fs.readdirSync(dir, { withFileTypes: true }).filter((e) => e.isDirectory() && U.NAME_RE.test(e.name)).length;
+  const checkQuota = (req) => { if (countProjects(ownRoot(req)) >= maxProjects) throw httpErr(403, `Project limit reached (${maxProjects}). Delete a project first.`); };
+  const pdirOf = (req) => { const d = U.projectDir(rootOf(req), pname(req)); if (!fs.existsSync(d)) throw httpErr(404, 'Project not found'); return d; };
+  const P = (req) => ({ name: keyOf(req, pname(req)), label: pname(req), dir: pdirOf(req) });
+  const ownerOnly = (req, what) => { if (req.role && req.role !== 'owner') throw httpErr(403, `Only the project's owner can ${what}`); };
+
+  // Shared projects: a collaborator addresses one as "owner/project". Resolve it to the owner's folder and
+  // check the role; viewers may read, compile and search, but not change anything.
+  const VIEWER_OK = /\/(compile|compile\/stop|clean|search|share\/leave|copy)$/;
+  r.param('p', (req, res, next, p) => {
+    if (req.ownRoot === undefined) { req.ownRoot = req.userRoot; req.ownScope = req.scope; }
+    req.role = 'owner'; req.shared = false;
+    if (shares && req.user && String(p).includes('/')) {
+      const i = p.indexOf('/'), owner = p.slice(0, i), project = p.slice(i + 1);
+      if (!USER_RE.test(owner) || !U.NAME_RE.test(project)) return next(httpErr(400, 'Invalid project name'));
+      const role = accounts.users[owner] ? shares.roleOf(req.user, owner, project) : null;
+      if (!role) return next(httpErr(404, 'Project not found'));
+      Object.assign(req, { userRoot: accounts.root_(owner), scope: owner + '/', projectName: project, role, shared: role !== 'owner' });
+    }
+    if (req.role === 'view' && req.method !== 'GET' && !(req.method === 'POST' && VIEWER_OK.test(req.path))) return next(httpErr(403, 'You can view this project but not change it'));
+    next();
+  });
   const clientId = (req) => String(req.get('x-client-id') || '').slice(0, 40);
 
   // ---------- projects ----------
   r.get('/projects', wrap((req, res) => {
     const list = fs.readdirSync(rootOf(req), { withFileTypes: true }).filter((e) => e.isDirectory() && U.NAME_RE.test(e.name))
       .map((e) => ({ name: e.name, mtime: fs.statSync(path.join(rootOf(req), e.name)).mtimeMs })).sort((a, b) => a.name.localeCompare(b.name));
-    res.json({ projects: list.map((p) => p.name), details: list, synctex: compiler.HAVE.synctex, latexmk: compiler.HAVE.latexmk, templates: templates.list.map(({ id, name, description }) => ({ id, name, description })) });
+    const shared = shares && req.user ? shares.sharedWith(req.user).filter((x) => fs.existsSync(path.join(accounts.root_(x.owner), x.project))) : [];
+    res.json({ projects: list.map((p) => p.name), details: list, shared, user: req.user || null, synctex: compiler.HAVE.synctex, latexmk: compiler.HAVE.latexmk, templates: templates.list.map(({ id, name, description }) => ({ id, name, description })) });
   }));
 
   r.post('/projects', wrap((req, res) => {
@@ -41,24 +63,43 @@ module.exports = function routes({ root, hub, timeoutMs, stallMs, maxProjects = 
   }));
 
   r.post('/projects/:p/rename', wrap((req, res) => {
+    ownerOnly(req, 'rename it');
     const d = pdirOf(req); const to = U.projectDir(rootOf(req), req.body.to);
     if (fs.existsSync(to)) throw httpErr(409, 'A project with that name already exists');
-    compiler.cancel(keyOf(req, req.params.p)); hub.gc(keyOf(req, req.params.p), true);
-    fs.renameSync(d, to); res.json({ ok: true });
+    compiler.cancel(keyOf(req, pname(req))); hub.gc(keyOf(req, pname(req)), true);
+    fs.renameSync(d, to); if (shares && req.user) shares.rename(req.user, pname(req), req.body.to);
+    res.json({ ok: true });
   }));
 
   r.post('/projects/:p/copy', wrap((req, res) => {
     checkQuota(req);
-    const d = pdirOf(req); const to = U.projectDir(rootOf(req), req.body.to);
+    const d = pdirOf(req); const to = U.projectDir(ownRoot(req), req.body.to);   // a copy of a shared project is your own
     if (fs.existsSync(to)) throw httpErr(409, 'A project with that name already exists');
     fs.cpSync(d, to, { recursive: true, filter: (src) => path.basename(src) !== U.BUILD });
     res.json({ ok: true });
   }));
 
   r.delete('/projects/:p', wrap((req, res) => {
-    const d = pdirOf(req); compiler.cancel(keyOf(req, req.params.p)); hub.gc(keyOf(req, req.params.p), true);
-    fs.rmSync(d, { recursive: true, force: true }); res.json({ ok: true });
+    ownerOnly(req, 'delete it');
+    const d = pdirOf(req); compiler.cancel(keyOf(req, pname(req))); hub.gc(keyOf(req, pname(req)), true);
+    fs.rmSync(d, { recursive: true, force: true }); if (shares && req.user) shares.drop(req.user, pname(req));
+    res.json({ ok: true });
   }));
+
+  // ---------- sharing (accounts mode) ----------
+  const needShares = () => { if (!shares) throw httpErr(404, 'Sharing needs accounts (ACCOUNTS=1)'); };
+  const ownerOf = (req) => req.scope.slice(0, -1);
+  r.get('/p/:p/share', wrap((req, res) => { needShares(); pdirOf(req); res.json({ role: req.role, me: req.user, ...shares.info(ownerOf(req), pname(req), req.role === 'owner') }); }));
+  r.post('/p/:p/share/invite', wrap((req, res) => {
+    needShares(); ownerOnly(req, 'share it'); pdirOf(req);
+    const u = String(req.body.user || '').trim().toLowerCase();
+    if (!accounts.users[u]) throw httpErr(404, `There is no account called "${u}" on this server`);
+    shares.invite(req.user, pname(req), u, req.body.role); res.json({ ok: true });
+  }));
+  r.post('/p/:p/share/remove', wrap((req, res) => { needShares(); ownerOnly(req, 'change who it is shared with'); shares.remove(req.user, pname(req), String(req.body.user || '')); res.json({ ok: true }); }));
+  r.post('/p/:p/share/leave', wrap((req, res) => { needShares(); if (!req.shared) throw httpErr(400, 'You own this project'); shares.remove(ownerOf(req), pname(req), req.user); res.json({ ok: true }); }));
+  r.post('/p/:p/share/link', wrap((req, res) => { needShares(); ownerOnly(req, 'change its share links'); pdirOf(req); res.json({ token: shares.setLink(req.user, pname(req), req.body.role, !!req.body.on) }); }));
+  r.post('/share/join', wrap((req, res) => { needShares(); res.json(shares.join(req.user, String(req.body.token || ''))); }));
 
   // ---------- settings ----------
   r.get('/p/:p/settings', wrap((req, res) => {
