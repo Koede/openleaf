@@ -11,6 +11,8 @@ services:
       COMPILE_TIMEOUT_MS: ${COMPILE_TIMEOUT_MS:-1200000}  # hard limit per compile (20 min)
       COMPILE_STALL_MS: ${COMPILE_STALL_MS:-120000}       # stop after this long with no new pages/files/steps
       TEX_OPENIN: ${TEX_OPENIN:-p}          # p: ../ inside the project works, nothing outside it
+      ADMIN_USERS: ${ADMIN_USERS:-}         # who reviews feedback (comma-separated); empty = first account
+      FEEDBACK_GITHUB: ${FEEDBACK_GITHUB-Koede/openleaf}  # repo for "Open on GitHub"; empty hides the button
     volumes: [ "openleaf-data:/data" ]
     mem_limit: 2g
     pids_limit: 512

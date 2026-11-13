@@ -22,10 +22,15 @@ function computeScale() {
 function layout(scale) { let y = PAD; V.top = V.size.map((s) => { const t = y; y += s.h * scale + GAP; return t; }); return y - GAP + PAD; }
 const pageAt = (y) => { let lo = 0, hi = V.top.length - 1; while (lo < hi) { const mid = (lo + hi + 1) >> 1; if (V.top[mid] <= y) lo = mid; else hi = mid - 1; } return lo; };
 
-export async function load(url, version, name) {
+// opts.quiet: no error toast when there is simply no PDF yet (opening a project that was never compiled).
+export async function load(url, version, name, opts = {}) {
   const my = ++V.loadToken;
   let doc;
-  try { doc = await pdfjsLib.getDocument({ url }).promise; } catch (e) { if (my === V.loadToken) toast('Could not display the PDF: ' + e.message, { kind: 'error' }); return; }
+  try { doc = await pdfjsLib.getDocument({ url }).promise; } catch (e) {
+    const missing = e && (e.name === 'MissingPDFException' || e.status === 404 || /\(404\)/.test(e.message));
+    if (my === V.loadToken && !(opts.quiet && missing)) toast('Could not display the PDF: ' + e.message, { kind: 'error' });
+    return;
+  }
   if (my !== V.loadToken) { killDoc(doc); return; }
   const old = V.doc;
   V.doc = doc; V.version = version; if (name) V.name = name; V.texts.clear();

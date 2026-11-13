@@ -6,6 +6,7 @@ const path = require('path');
 const crypto = require('crypto');
 const { Hub } = require('./hub');
 const makeRoutes = require('./routes');
+const { feedbackRouter } = require('./feedback');
 const compiler = require('./compile');
 const { Accounts } = require('./accounts');
 
@@ -71,6 +72,8 @@ function start(opts = {}) {
   app.use(express.json({ limit: '25mb' }));
   app.get('/favicon.ico', (q, r) => r.status(204).end());
   if (accounts) accounts.mount(app);
+  const texVersion = (() => { try { return (require('child_process').spawnSync('pdftex', ['--version'], { encoding: 'utf8' }).stdout || '').split('\n')[0].replace(/^This is /, '').trim() || null; } catch { return null; } })();
+  app.use('/api', feedbackRouter({ root: ROOT, accounts, info: { version: require('../package.json').version, tex: texVersion } }));
   app.use('/api', makeRoutes({ root: ROOT, hub, timeoutMs: TIMEOUT, stallMs: STALL, maxProjects: MAX_PROJECTS }));
   if (!accounts) app.get('/api/auth/me', (req, res) => res.json({ accounts: false, user: null }));
   app.use(express.static(path.join(__dirname, '..', 'public'), { etag: true, maxAge: 0 }));

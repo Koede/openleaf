@@ -12,6 +12,7 @@ import { connect, watch } from './ws.js';
 import './symbols.js';
 import './format.js';
 import { ensureSignedIn, signOut, changePassword } from './auth.js';
+import { initFeedback, openFeedback } from './feedback.js';
 
 const $ = (id) => document.getElementById(id);
 const mac = /Mac|iPhone|iPad/.test(navigator.platform);
@@ -155,7 +156,7 @@ export async function openProject(name) {
   if (first) await files.openFile(first, { focus: false });
   bus.emit('current', { path: S.current });
   // show an existing PDF immediately, then recompile
-  if (!window.__DEMO) pdf.load(`${P()}/output.pdf?t=${Date.now()}`, Date.now(), S.settings.main && S.settings.main.replace(/\.tex$/, '.pdf')).catch(() => {});
+  if (!window.__DEMO) pdf.load(`${P()}/output.pdf?t=${Date.now()}`, Date.now(), S.settings.main && S.settings.main.replace(/\.tex$/, '.pdf'), { quiet: true }).catch(() => {});
   if (prefs.autoCompile) bus.emit('compile-request', { force: true });
 }
 
@@ -193,8 +194,10 @@ $('helpBtn').onclick = () => modal({
   title: 'Keyboard shortcuts', cancel: '', ok: 'Close', width: '460px',
   html: `<table class="keys">${[
     [`${MOD}+Enter`, 'Recompile'], [`${MOD}+S`, 'Save now (and compile)'], [`${MOD}+Shift+K`, 'Symbols & templates palette'], ['Tab / Shift+Tab', 'Next / previous template box; Tab also steps out of a closing brace'], [`${MOD}+B / I / M`, 'Bold / italic / inline math'], [`${MOD}+U`, 'Underline'], [`${MOD}+Shift+E / L / R / J`, 'Centre / left / right / justify'], [`${MOD}+Shift+7 / 8`, 'Numbered / bulleted list'], [`${MOD}+Alt+0 / 1 / 2 / 3`, 'Normal text / section / subsection / subsubsection'], [`${MOD}+/`, 'Toggle comment'], [`${MOD}+F`, 'Find in file'], [`${MOD}+Shift+F`, 'Search project'], [`${MOD}+Alt+J`, 'Jump from source to PDF'], ['Double-click PDF', 'Jump from PDF to source'], [`${MOD}+Space`, 'Autocomplete'],
-  ].map(([k, d]) => `<tr><td><kbd>${k}</kbd></td><td>${d}</td></tr>`).join('')}</table>`,
+  ].map(([k, d]) => `<tr><td><kbd>${k}</kbd></td><td>${d}</td></tr>`).join('')}</table>
+  <p class="modal-msg" style="margin-top:12px">Found a bug or missing something? <a href="#" id="helpFb">Send feedback</a> (also under <b>Feedback</b> in the top bar).</p>`,
 });
+document.addEventListener('click', (e) => { if (e.target && e.target.id === 'helpFb') { e.preventDefault(); document.querySelector('.modal-back')?.remove(); openFeedback('new'); } });
 
 // ---------- file tree buttons / uploads ----------
 $('newFileBtn').onclick = () => newFile(''); $('newFolderBtn').onclick = () => newFolder('');
@@ -231,7 +234,7 @@ window.addEventListener('resize', () => pdf.resizeNow());
 async function boot() {
   applyTheme(); applyLayout(); syncAuto();
   if (!(await ensureSignedIn()) && S.accounts) return;
-  initPanels(); connect(); renderTree();
+  initPanels(); connect(); renderTree(); initFeedback();
   if (S.user) { $('projBtn').title = `Signed in as ${S.user}`; }
   let r; try { r = await listProjects(); } catch (e) { toast(e.message, { kind: 'error', ms: 10000 }); return; }
   if (!r.latexmk) toast('latexmk not found — install TeX Live to compile.', { kind: 'warn', ms: 10000 });

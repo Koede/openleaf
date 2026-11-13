@@ -64,6 +64,22 @@ selection is wrapped instead.
 Packages a control needs (`xcolor`, `soul`, `ulem`, `ragged2e`, `setspace`, …) are offered with an **Add it** button.
 Shortcuts: `Ctrl+U`, `Ctrl+Shift+E/L/R/J`, `Ctrl+Shift+7/8`, `Ctrl+Alt+0…3`.
 
+## Feedback (bug reports and feature requests)
+
+**Feedback** in the top bar opens a form with two kinds, *Bug* and *Feature request* (bugs start
+from a what happened / expected / steps template). Optionally it attaches diagnostics, shown in full
+before sending: openleaf and TeX versions, browser, engine and main file, and the last compile's
+error messages. It never attaches document text or the project's name.
+
+- **Send** stores the report on the server (`<PROJECTS_DIR>/.openleaf/feedback.json`). Each user
+  sees what they sent; admins see everything, can set a status (open, planned, in progress, done,
+  won't do) and delete items. Admins are the users in `ADMIN_USERS` (comma-separated) or, if unset,
+  the first account created; without accounts the single user is the admin. Admins get a count of
+  open reports on the button. Limits: 15 reports per user per hour, 20 000 characters per report.
+- **Open on GitHub** opens a prefilled public issue (labelled `bug` or `enhancement`) on
+  `FEEDBACK_GITHUB` (default `Koede/openleaf`; set it empty to hide the button). The person reviews
+  it on GitHub before posting.
+
 ## Tests
 
 `node --test test/*.test.js` runs the unit/API tests, including a benchmark for the Detexify matcher (`tools/tune-matcher.js`

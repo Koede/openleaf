@@ -40,6 +40,7 @@ async function handle(url, init = {}) {
   if (path === '/symbols/symbols.json') return json(symbolsJson);
   if (!path.startsWith('/api/')) return null;
   const parts = path.slice(5).split('/').map(decodeURIComponent);
+  if (parts[0] === 'feedback') return err('Sending feedback needs the openleaf server; use "Open on GitHub" instead.', 503);
   if (parts[0] === 'projects') {
     if (parts.length === 1 && method === 'GET') return json({ projects: [...projects.keys()].sort(), details: [...projects].map(([name, p]) => ({ name, mtime: p.mtime })), synctex: false, latexmk: true, templates: templates.map(({ id, name, description }) => ({ id, name, description })) });
     if (parts.length === 1 && method === 'POST') { if (projects.has(body.name)) return err('A project with that name already exists', 409); projects.set(body.name, mkProject(body.template)); return json({ ok: true }); }
